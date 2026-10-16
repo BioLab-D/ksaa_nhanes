@@ -1,0 +1,9 @@
+"item","backbone","checkpoint","value"
+"ensemble_weight","ResNet-18","m5_full_resnet18_full.pt",0.19948632978
+"ensemble_weight","ResNet-50","m5_full_resnet50_full.pt",0.20129149018
+"ensemble_weight","EfficientNet-B0","m5_full_efficientnetb0_full.pt",0.1988292633
+"ensemble_weight","ConvNeXt-Tiny","m5_full_convnexttiny_full.pt",0.20185241044
+"ensemble_weight","DenseNet-121","m5_full_densenet121_full.pt",0.1985405063
+"expected_pred_intercept",,,33.5549482436146
+"expected_pred_slope",,,0.527111409920867
+"ksaa_sd",,,3.94548280907031

@@ -1,0 +1,13 @@
+results/
+__pycache__/
+*.pyc
+.DS_Store
+.Rhistory
+Rplots.pdf
+*.pre*
+.Rproj.user/
+*.Rproj
+.ipynb_checkpoints/
+data/raw/
+data/knee_roi/
+models/*.pt

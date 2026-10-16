@@ -1,0 +1,14 @@
+# Figure 4 (code/analysis/v3_fig9_phewas_clarite.py, v3_fig9_phewas_pdf.py)
+clarite==2.3.6          # its own environment was used: Python 3.9, matplotlib 3.9.4
+PyMuPDF                 # v3_fig9_phewas_pdf.py (system Python)
+Pillow
+
+# Knee age model training (code/model; GPU server, CUDA 12.1)
+torch==2.1.2
+torchvision==0.16.2
+numpy==1.26.4
+albumentations==1.4.14
+opencv-python==4.11.*
+
+# Image processing and knee detection (code/images)
+ultralytics==8.4.135    # with torch 2.5.1
