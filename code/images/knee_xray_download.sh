@@ -1,6 +1,6 @@
 #!/bin/bash
-# 下载 NHANES III 膝片(877 个文件;按 manifest 中 CDC 公布的字节数判断完整,-c 断点续传,多轮重试)。
-# --no-check-certificate:途中的 TLS 拦截设备会导致证书校验失败;完整性由字节数核对保证。
+# Download the NHANES III knee radiographs (877 files; completeness checked against the byte sizes published by CDC in the manifest, -c resumes, several retry rounds).
+# --no-check-certificate: a TLS-intercepting device on the route breaks certificate validation; integrity is ensured by the byte-size check.
 
 DIR=/home/data/knee_xray
 MANIFEST=/home/data/knee_xray_manifest.tsv

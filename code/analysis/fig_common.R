@@ -1,4 +1,4 @@
-# 图的公共部分:路径、配色、主题、森林图、结果文件解析、保存
+# Shared figure code: paths, colors, theme, forest plots, result-file parsing, saving
 suppressMessages({library(ggplot2); library(patchwork); library(survival)})
 RES <- here::here("results"); V3 <- file.path(RES, "analysis"); FIGD <- here::here("results", "figures")
 INK <- "#0b0b0b"; INK2 <- "#52514e"; MUTED <- "#898781"; GRID <- "#e1e0d9"; AXIS <- "#c3c2b7"
@@ -8,11 +8,11 @@ th <- theme_minimal(base_family = "Arial", base_size = 8) + theme(panel.grid.min
   plot.title = element_text(colour = INK, size = 8.5, face = "bold"), plot.margin = margin(4, 6, 2, 4), strip.text = element_text(colour = INK, size = 7.5, face = "bold"),
   legend.text = element_text(colour = INK, size = 7), legend.title = element_text(colour = INK, size = 7))
 mi <- function(x) gsub("-", "\u2212", x, fixed = TRUE)
-f2 <- function(x, d = 2) mi(sub("^-(0\\.0+)$", "\\1", formatC(round(x + sign(x) * 1e-9, d), format = "f", digits = d)))  # 常规四舍五入:1.035 → 1.04(formatC 按二进制会给 1.03)
+f2 <- function(x, d = 2) mi(sub("^-(0\\.0+)$", "\\1", formatC(round(x + sign(x) * 1e-9, d), format = "f", digits = d)))  # round half up: 1.035 -> 1.04 (formatC rounds the binary value and gives 1.03)
 ci <- function(h, l, u, d = 2) ifelse(is.na(h), "", sprintf("%s (%s%s%s)", f2(h, d), f2(l, d), ifelse(l < 0 | u < 0, " to ", "\u2013"), f2(u, d)))
 cm <- function(x) formatC(round(x), format = "d", big.mark = ",")
 
-# 森林图:F 需列 lab、hdr(逻辑)、est、lo、hi、txt;可选 series(着色)、filled。三栏(标签 | 森林 | 数值)各自成图再拼,避免文字压到相邻面板
+# Forest plot: F needs columns lab, hdr (logical), est, lo, hi, txt; optional series (color) and filled. The three columns (labels | forest | values) are drawn as separate plots and combined so text never overlaps the next panel
 forest <- function(F, title, xlab, xlim, breaks, ref = 1, pal = c(main = BLUE), widths = c(1.35, 1, 0.62), lab_size = 2.4) {
   F$y <- rev(seq_len(nrow(F))); if (is.null(F$series)) F$series <- names(pal)[1]; if (is.null(F$filled)) F$filled <- TRUE
   yl <- c(0.5, nrow(F) + 0.5); G <- F[!F$hdr, ]; many <- length(pal) > 1
@@ -34,19 +34,19 @@ forest <- function(F, title, xlab, xlim, breaks, ref = 1, pal = c(main = BLUE), 
 hdrrow <- function(lab) data.frame(lab = lab, hdr = TRUE, est = NA, lo = NA, hi = NA, txt = "")
 estrow <- function(lab, est, lo, hi, ...) data.frame(lab = lab, hdr = FALSE, est = est, lo = lo, hi = hi, txt = ci(est, lo, hi), ...)
 
-# 解析结果文件里的 "HR x (lo–hi)",解析失败即报错
+# Parse "HR x (lo–hi)" from a result file; stop if parsing fails
 grab <- function(file, key, after = "HR ") {
-  l <- grep(key, readLines(file.path(RES, file), encoding = "UTF-8"), value = TRUE, fixed = TRUE); if (length(l) < 1) stop("找不到: ", key)
+  l <- grep(key, readLines(file.path(RES, file), encoding = "UTF-8"), value = TRUE, fixed = TRUE); if (length(l) < 1) stop("not found: ", key)
   s <- sub(paste0("^.*?", after), "", l[1], perl = TRUE); x <- regmatches(s, regexec("([0-9.]+) \\(([0-9.]+)[-\u2013]([0-9.]+)\\)", s))[[1]]
-  if (length(x) < 4) stop("解析失败: ", key); as.numeric(x[2:4])
+  if (length(x) < 4) stop("could not parse: ", key); as.numeric(x[2:4])
 }
-save_fig <- function(p, name, w, h) {  # PNG 必出;PDF 尽力而为
+save_fig <- function(p, name, w, h) {  # PNG always; PDF best effort
   ggsave(file.path(FIGD, paste0(name, ".png")), p, width = w, height = h, dpi = 300, bg = "white")
-  # cairo 加载失败时 ggsave 可能不报错也不写文件:先删旧 PDF,cairo 没写出就改用 quartz
+  # if cairo fails to load, ggsave may write nothing without an error: remove the old PDF first and fall back to quartz if cairo wrote nothing
   pdf_f <- file.path(FIGD, paste0(name, ".pdf")); if (file.exists(pdf_f)) file.remove(pdf_f)
   try_dev <- function(dev) tryCatch({ suppressWarnings(dev()); file.exists(pdf_f) && file.size(pdf_f) > 0 },
                                     error = function(e) { cat("  PDF(", conditionMessage(e), ")\n"); FALSE })
   ok <- try_dev(function() ggsave(pdf_f, p, width = w, height = h, device = cairo_pdf, bg = "white"))
   if (!ok && capabilities("aqua")) ok <- try_dev(function() ggsave(pdf_f, p, width = w, height = h, device = grDevices::quartz, type = "pdf", bg = "white"))
-  cat("->", name, if (ok) ".png/.pdf\n" else ".png(PDF 未写出)\n")
+  cat("->", name, if (ok) ".png/.pdf\n" else ".png (PDF not written)\n")
 }

@@ -1,9 +1,9 @@
-# Figure 4:本脚本画 B(森林图),并导出 A 的数据;A 由 fig4_phewas_clarite.py 用 CLARITE 的 manhattan 绘制并与 B 拼图。
-#   B = 前 NTOP 个独立信号(FDR<5% 者按 |r|>0.7 归并后按 P 排序),KSAA 每 SD → 表型:上段二分类/有序 OR,下段连续 SD 差;标签数字 = 排名,点色 = 健康类别
-# 输入 results/analysis/phewas/phewas_results.csv;输出 figures/Figure4A.csv、Figure4B
+# Figure 4: this script draws B (forest plot) and exports the data for A; fig4_phewas_clarite.py draws A with CLARITE's manhattan plot and combines it with B.
+#   B = top NTOP independent signals (FDR < 5% hits merged at |r| > 0.7, then ordered by P), per SD of KSAA -> phenotype: top block binary/ordinal OR, bottom block continuous SD difference; label numbers = rank, point color = health category
+# Input: results/analysis/phewas/phewas_results.csv; output: figures/Figure4A.csv, Figure4B
 source(here::here("code", "analysis", "fig_common.R"))
 source(here::here("code", "analysis", "phewas_labels.R"))
-# 整图通栏 183 mm,字号 5.2 pt(同图 2、3);B 宽 3.15 in
+# full figure is 183 mm wide, font size 5.2 pt (as in Figures 2 and 3); B is 3.15 in wide
 TS <- 5.2 / .pt
 forest1 <- function(D, xl, fr, log = FALSE, breaks, blabels = breaks, ref, xlab, head) {
   tf <- if (log) log10 else identity; itf <- if (log) function(z) 10^z else identity
@@ -33,16 +33,16 @@ R <- read.csv(file.path(V3, "phewas", "phewas_results.csv")); R <- R[R$set == "m
 stopifnot(all(R$health_class %in% CLS_ORDER))
 L <- R[!is.na(R$clump_lead) & R$clump_lead == R$variable, ]; L <- L[order(L$p), ]
 NTOP <- as.numeric(Sys.getenv("PHEWAS_NTOP", "25"))
-TOP <- head(L$variable, NTOP); rk <- setNames(seq_along(TOP), TOP)   # A 的标签同步标注排名
+TOP <- head(L$variable, NTOP); rk <- setNames(seq_along(TOP), TOP)   # labels in A show the same ranks
 SHORT <- c(BDPTRBMD = "Trochanter BMD", PEP1 = "Abnormal locomotion (examination)", HAY11D = "Walks slowly (observed)", PFPNSTPA = "Steps to walk 8 ft", HAH9 = "Chair-rise difficulty",
            HAH3 = "Stooping difficulty", HAG34 = "Chronic limp", PEP13E5A = "Heavy-housework difficulty (physician)", PFPRFLEX = "Limited hip and knee flexion", PEP13A = "Poorer physician-rated health", HAH2 = "10-step walk difficulty", HAG22 = "Knee pain",
            APPSI = "Alkaline phosphatase", HAH1 = "\u00bc-mile walk difficulty", HAH15 = "Uses walking aid (self-reported)", HAC1A = "Arthritis", CRP = "C-reactive protein",
-           # 行走辅具三项分别注明来源,避免看成重复
+           # the three walking-aid items name their source so they do not look like duplicates
            HAY11C = "Uses walking aid (observed)", FPP1090 = "Hard exudates (retina)", PFPDEVIC = "Type of walking aid", HAH5 = "Household-chore difficulty",
            HAH6 = "Meal-preparation difficulty", HAH8 = "Room-to-room walk difficulty", HAG5A = "Self-reported hip fracture", PEP10B4 = "Knee pain on passive motion", HAH4 = "Lifting 10 lb difficulty",
            PFP_steps_8ft_mean = "Steps to walk 8 ft", PEP13E1A = "\u00bc-mile walk difficulty (physician)", PEP13E2A = "100-yard run difficulty (physician)")
 short <- function(v, lab) ifelse(v %in% names(SHORT), SHORT[v], nice(v, lab))
-# ---- a 的数据(供 CLARITE)----
+# ---- data for A (for CLARITE) ----
 A <- data.frame(variable = R$variable, label = ifelse(R$variable %in% TOP, sprintf("%d  %s", rk[R$variable], short(R$variable, R$phenotype)), short(R$variable, R$phenotype)),
                 category = CLS_NAME[R$health_class], colour = CLS_COL[R$health_class], p = R$p, fdr = R$fdr, replicated = R$replicated, is_top = R$variable %in% TOP)
 write.csv(A, file.path(FIGD, "Figure4A.csv"), row.names = FALSE)
@@ -50,8 +50,8 @@ write.csv(A, file.path(FIGD, "Figure4A.csv"), row.names = FALSE)
 mrow <- function(v) { r <- R[R$variable == v, ]; data.frame(lab = sprintf("%d  %s", rk[[v]], short(v, r$phenotype)), hdr = FALSE, est = r$est, lo = r$lo, hi = r$hi, txt = ci(r$est, r$lo, r$hi), col = CLS_COL[[r$health_class]]) }
 hrow <- function(lab) data.frame(lab = lab, hdr = TRUE, est = NA, lo = NA, hi = NA, txt = "", col = INK)
 VOR <- TOP[R$model[match(TOP, R$variable)] %in% c("binomial", "ordinal")]; VSD <- TOP[R$model[match(TOP, R$variable)] == "gaussian"]; stopifnot(length(VOR) + length(VSD) == NTOP)
-# B 块内按健康领域(= 点色)排,领域内按 P
-ordcls <- function(vs) { i <- match(vs, R$variable)   # 领域顺序与 A 的图例一致(CLARITE 按类别名字母序),不用 CLS_ORDER
+# within each block of B, order by health domain (= point color), then by P
+ordcls <- function(vs) { i <- match(vs, R$variable)   # domain order matches the legend of A (CLARITE sorts categories alphabetically), not CLS_ORDER
   vs[order(CLS_NAME[R$health_class[i]], R$p[i], method = "radix")] }
 VOR <- ordcls(VOR); VSD <- ordcls(VSD)
 B1 <- rbind(hrow("Binary and ordinal phenotypes"), do.call(rbind, lapply(VOR, mrow))); B1$row <- rev(seq_len(nrow(B1)))
@@ -61,8 +61,8 @@ XL2 <- max(0.25, ceiling(max(abs(c(B2$lo, B2$hi)), na.rm = TRUE) * 10) / 10); XL
 pb1 <- forest1(B1, xl = XL1, fr = c(0.57, 0.21, 0.22), log = TRUE, breaks = BR1, blabels = as.character(BR1), ref = 1, xlab = "Odds ratio per SD of KSAA", head = "OR (95% CI)")
 pb2 <- forest1(B2, xl = XL2, fr = c(0.57, 0.21, 0.22), breaks = BR2, blabels = mi(as.character(BR2)), ref = 0, xlab = "SD difference per SD of KSAA", head = "Difference, SD (95% CI)")
 pb <- pb1 / pb2 + plot_layout(heights = c(nrow(B1) + 2.6, nrow(B2) + 2.6))
-PF <- as.numeric(Sys.getenv("PHEWAS_PITCH", "0.78"))   # 行距压缩系数
+PF <- as.numeric(Sys.getenv("PHEWAS_PITCH", "0.78"))   # row-spacing compression factor
 BH <- PF * 4.2 * (nrow(B1) + nrow(B2) + 5.2) / (17 + 5.2)
 save_fig(pb, "Figure4B", 3.15, BH)
-cat(sprintf("a 数据:%d 个表型;b:前 %d(OR %d / SD %d),高 %.2f in\n", nrow(A), NTOP, length(VOR), length(VSD), BH))
+cat(sprintf("A data: %d phenotypes; B: top %d (OR %d / SD %d), height %.2f in\n", nrow(A), NTOP, length(VOR), length(VSD), BH))
 for (i in seq_len(NTOP)) cat(sprintf("  %2d %-9s %-40s %s\n", i, L$variable[i], short(L$variable[i], L$phenotype[i]), ci(L$est[i], L$lo[i], L$hi[i])))

@@ -1,18 +1,18 @@
-# 图 3:KSAA 在 PhenoAge 加速之上的增量预后价值。
-#   A 两者同时入模的每 SD HR;B 加入 KSAA 前后的 Harrell C 与 R²_D(标相对增幅);C–E 按两者四分位交叉分格的 HR(参照 Q1×Q1)。
-# 样本 n = 4,522(PhenoAge 可得者)。合并评分权重在同一样本内估计,为表观值(未做乐观校正);改善的 CI 由 bootstrap 给出,每次重抽都重估权重。
-# 输入 results/analysis/{phenoage_combined_cindex.csv, phenoage_combined_improvement.csv, phenoage_wald.csv, joint_cells.csv, joint_within.csv}
+# Figure 3: incremental prognostic value of KSAA beyond Phenotypic Age acceleration.
+#   A, per-SD HRs with both in the model; B, Harrell's C and R²_D before and after adding KSAA (with relative gains); C–E, HRs in cells cross-classified by the quartiles of both (reference Q1×Q1).
+# n = 4,522 (PhenoAge available). Weights of the combined score are estimated in the same sample, so values are apparent (no optimism correction); CIs of the gains come from the bootstrap, re-estimating the weights in every resample.
+# Input: results/analysis/{phenoage_combined_cindex.csv, phenoage_combined_improvement.csv, phenoage_wald.csv, joint_cells.csv, joint_within.csv}
 source(here::here("code", "analysis", "fig_common.R"))
-GREEN <- "#2e7d55"   # 标注「加入 KSAA 后的改善」用色,非数据编码
+GREEN <- "#2e7d55"   # color of the "gain from adding KSAA" annotation, not a data encoding
 OUT3 <- c("All-cause", "Cardiovascular", "Cancer")
 norm_out <- function(x) factor(sub(" mortality$", "", sub("^CVD", "Cardiovascular", x)), OUT3)
 
 CI7 <- read.csv(file.path(V3, "phenoage_combined_cindex.csv")); CI7$o <- norm_out(CI7$outcome)
 IMP <- read.csv(file.path(V3, "phenoage_combined_improvement.csv")); IMP$o <- norm_out(IMP$outcome)
 WD <- read.csv(file.path(V3, "phenoage_wald.csv")); WD$o <- norm_out(WD$outcome)
-JC <- read.csv(file.path(V3, "joint_cells.csv")); JC <- JC[JC$panel %in% c("main", "main_cvd", "main_cancer"), ]   # 全因 / 心血管 / 癌症三张热图
-JW <- read.csv(file.path(V3, "joint_within.csv")); JW <- JW[JW$panel %in% c("main", "main_cvd"), ]   # 各档内 KSAA 每 SD 的 HR(图注与输出用)
-# 默认用调查加权结果(results/analysis/weighted/);KSAA_UNWEIGHTED=1 画不加权版。样本与四分位切点(未加权)不变。
+JC <- read.csv(file.path(V3, "joint_cells.csv")); JC <- JC[JC$panel %in% c("main", "main_cvd", "main_cancer"), ]   # three heat maps: all-cause / cardiovascular / cancer
+JW <- read.csv(file.path(V3, "joint_within.csv")); JW <- JW[JW$panel %in% c("main", "main_cvd"), ]   # per-SD HR of KSAA within each quartile (for the legend and console output)
+# Uses the survey-weighted results by default (results/analysis/weighted/); KSAA_UNWEIGHTED=1 draws the unweighted version. Sample and (unweighted) quartile cut points are the same.
 if (Sys.getenv("KSAA_UNWEIGHTED") != "1") { WD_ <- file.path(V3, "weighted")
   OM <- c(allcause = "All-cause mortality", cvd = "CVD mortality", cancer = "Cancer mortality"); PN <- c(allcause = "main", cvd = "main_cvd", cancer = "main_cancer")
   x <- read.csv(file.path(WD_, "figure3a.csv")); x$outcome <- OM[x$outcome]; x$o <- norm_out(x$outcome); WD <- x
@@ -26,31 +26,31 @@ if (Sys.getenv("KSAA_UNWEIGHTED") != "1") { WD_ <- file.path(V3, "weighted")
   w3 <- read.csv(file.path(WD_, "figure3_within.csv")); w3 <- w3[w3$outcome %in% c("allcause", "cvd"), ]
   JW <- data.frame(panel = PN[w3$outcome], stratum = w3$stratum, n = NA, deaths = NA, hr = w3$hr, lo = w3$lo, hi = w3$hi) }
 
-# 两个测度都是对实足年龄的残差,一律按每 SD 报告。
+# Both measures are residuals on chronological age and are reported per SD.
 FS <- 5.2
-AL <- as.numeric(Sys.getenv("FIG3_AL", "24"))   # A 的面板字母左缩进(pt):与下排 C 的字母同竖线
+AL <- as.numeric(Sys.getenv("FIG3_AL", "24"))   # left indent of panel letter A (pt): aligned with letter C in the bottom row
 PA <- "Phenotypic Age acceleration"; PK <- "Phenotypic Age acceleration + KSAA"; KS <- "KSAA"
 NAVY <- "#0d366b"
 PAL <- setNames(c(ORANGE, NAVY, NAVY), c(PA, PK, KS))
 SHP <- setNames(c(16, 18, 15), c(PA, PK, KS))
 SZ <- setNames(c(1.3, 1.9, 1.35), c(PA, PK, KS))
 thk <- theme_classic(base_family = "Arial", base_size = FS) +
-  theme(axis.line = element_blank(), panel.border = element_rect(colour = MUTED, fill = NA, linewidth = .35),   # 边框与刻度线用中灰
+  theme(axis.line = element_blank(), panel.border = element_rect(colour = MUTED, fill = NA, linewidth = .35),   # mid-gray border and tick marks
         axis.ticks = element_line(colour = MUTED, linewidth = .35), axis.ticks.length = unit(2, "pt"),
         axis.text = element_text(colour = INK, size = FS), axis.title = element_text(colour = INK, size = FS),
         plot.title = element_text(size = 8, face = "bold", margin = margin(b = 1)), plot.title.position = "plot",
-        legend.position = "top", legend.location = "plot", legend.justification = "center", legend.direction = "horizontal", legend.title = element_blank(),   # 一行、以整张子图(含纵轴)居中
+        legend.position = "top", legend.location = "plot", legend.justification = "center", legend.direction = "horizontal", legend.title = element_blank(),   # one row, centered on the whole panel (including the y axis)
         legend.text = element_text(colour = INK, size = FS), legend.key.size = unit(6, "pt"), legend.key.spacing.x = unit(5, "pt"),
         legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(2, "pt"), plot.background = element_blank(), panel.background = element_blank(),
         plot.margin = margin(2, 6, 2, 2))
-cap <- NULL   # 点估计图不截短坐标轴(截短后误差线会伸出轴外)
-num <- function(x) { r <- round(x); ifelse(r == 0, "0", mi(as.character(r))) }                       # 0 不带正负号
+cap <- NULL   # do not cap the axes of the estimate plots (error bars would extend beyond capped axes)
+num <- function(x) { r <- round(x); ifelse(r == 0, "0", mi(as.character(r))) }                       # no sign on 0
 sgn <- function(x) { r <- round(x); ifelse(r == 0, "0", ifelse(r > 0, paste0("+", r), mi(as.character(r)))) }
 pct <- function(est, d) sprintf("%s%%", ifelse(round(est, d) > 0, paste0("+", f2(est, d)), f2(est, d)))
 
-# 纵轴上限按数据算:标注区(顶端留 2%、每行约 7%、再留 3%)须整体在最高 CI 端点之上
+# y-axis upper limit from the data: the annotation area (2% top margin, about 7% per line, plus 3%) must lie entirely above the highest CI limit
 ytop <- function(hi, bot, lines, step) { z <- 0.05 + 0.07 * lines; ceiling(((max(hi) - z * bot) / (1 - z)) / step) * step }
-mkpanel <- function(L, ann, title, ylab, ylim, breaks, ref = NA, ann_y = ylim[2] - 0.02 * diff(ylim)) {   # 绿字顶端离上边框留 2%
+mkpanel <- function(L, ann, title, ylab, ylim, breaks, ref = NA, ann_y = ylim[2] - 0.02 * diff(ylim)) {   # 2% between the top of the green text and the top border
   lev <- unique(L$series); L$series <- factor(L$series, lev)
   L$x <- as.integer(L$o) + ifelse(L$series == lev[1], -0.15, 0.15)
   p <- ggplot(L, aes(x, est, colour = series))
@@ -68,28 +68,28 @@ mkpanel <- function(L, ann, title, ylab, ylim, breaks, ref = NA, ann_y = ylim[2]
     guides(colour = guide_legend(nrow = 1, override.aes = list(size = 1.6)))
 }
 
-# ---- Harrell C(未入图)----
+# ---- Harrell's C (not plotted) ----
 La <- rbind(data.frame(o = CI7$o, est = CI7$C_pa, lo = CI7$C_pa_lo, hi = CI7$C_pa_hi, series = PA),
             data.frame(o = CI7$o, est = CI7$C_cb, lo = CI7$C_cb_lo, hi = CI7$C_cb_hi, series = PK))
 Aa <- data.frame(o = CI7$o, lab = pct(CI7$relC, 2))
 pa <- mkpanel(La, Aa, "A", "Harrell's C (95% CI)", c(0.63, ytop(La$hi, 0.63, 1, 0.005)), seq(0.65, 0.77, 0.03))
 
-# ---- 解释变异 R²_D(Royston–Sauerbrei;未入图)----
+# ---- explained variation R²_D (Royston–Sauerbrei; not plotted) ----
 Lr <- rbind(data.frame(o = CI7$o, est = CI7$R2_pa, lo = CI7$R2_pa_lo, hi = CI7$R2_pa_hi, series = PA),
             data.frame(o = CI7$o, est = CI7$R2_cb, lo = CI7$R2_cb_lo, hi = CI7$R2_cb_hi, series = PK))
 Ar <- data.frame(o = CI7$o, lab = pct(CI7$relR2, 1))
-pr <- mkpanel(Lr, Ar, "B", "Explained variation, R² (95% CI)", c(0.08, ytop(Lr$hi, 0.08, 1, 0.01)), seq(0.1, 0.4, 0.1))   # 不用 plotmath 下标:cairo_pdf 会报 CID 字体错误、PDF 写不出;R²_D 在图注中定义
+pr <- mkpanel(Lr, Ar, "B", "Explained variation, R² (95% CI)", c(0.08, ytop(Lr$hi, 0.08, 1, 0.01)), seq(0.1, 0.4, 0.1))   # no plotmath subscript: cairo_pdf raises a CID font error and writes no PDF; R²_D is defined in the legend
 
-# ---- A:三个结局下两者同时入模的每 SD HR(横向森林图,右侧列数值)----
-XLO <- 0.88; XHI <- 1.68; XT <- 1.73; XMAX <- 2.35   # 森林区 + 右侧数值列(对数轴)
-XBRK <- c(0.9, 1, 1.2, 1.4, 1.6)   # 轴线经 cap 收到首尾刻度之间,故最低刻度要覆盖癌症行 KSAA 的 CI 下界(0.95)
+# ---- A: per-SD HRs with both in the model, for three outcomes (horizontal forest plot, values on the right) ----
+XLO <- 0.88; XHI <- 1.68; XT <- 1.73; XMAX <- 2.35   # forest area + value column on the right (log axis)
+XBRK <- c(0.9, 1, 1.2, 1.4, 1.6)   # the axis line is capped between the first and last ticks, so the lowest tick must cover the lower CI limit of KSAA for cancer (0.95)
 hrtxt <- function(e, l, h) sprintf("%s (%s\u2013%s)", f2(e, 2), f2(l, 2), f2(h, 2))
 fbase <- function(df, ylim) ggplot(df, aes(hr, y)) +
   annotate("rect", xmin = XT / 1.04, xmax = XMAX, ymin = ylim[1], ymax = ylim[2], fill = "white", colour = NA) +
-  annotate("segment", x = 1, xend = 1, y = ylim[1], yend = ylim[2], linetype = "22", colour = MUTED, linewidth = 0.3) +   # 用线段而非 geom_vline:确保与横轴线相交
+  annotate("segment", x = 1, xend = 1, y = ylim[1], yend = ylim[2], linetype = "22", colour = MUTED, linewidth = 0.3) +   # a segment rather than geom_vline, so it meets the x-axis line
   scale_x_continuous(trans = "log", breaks = XBRK, labels = function(v) mi(formatC(v, format = "f", digits = 1)), expand = c(0, 0)) +
   coord_cartesian(xlim = c(XLO, XMAX), ylim = ylim, expand = FALSE, clip = "off") +
-  thk + guides(x = guide_axis(cap = "both")) +   # 轴线用 cap 收到首尾刻度之间(不穿过右侧数值列),且与刻度相连
+  thk + guides(x = guide_axis(cap = "both")) +   # axis line capped between the first and last ticks (not crossing the value column) and joined to the ticks
   theme(axis.line.x = element_line(colour = INK, linewidth = 0.35),
         axis.line.y = element_line(colour = INK, linewidth = 0.35),
         axis.ticks.y = element_blank(), panel.border = element_blank(), panel.grid = element_blank())
@@ -106,14 +106,14 @@ pc <- fbase(LA, c(0.45, 3.75)) +
   scale_size_manual(values = SZ[c(PA, KS)], guide = "none") +
   scale_y_continuous(breaks = 3:1, labels = OUT3, expand = c(0, 0)) +
   labs(title = "A", x = "HR per SD (95% CI)", y = NULL) +
-  theme(plot.title = element_text(margin = margin(l = AL, b = 1)),   # 字母右移,与下排 C 的字母同一竖线
-        axis.title.x = element_text(hjust = log(XHI / XLO) / (2 * log(XMAX / XLO)), margin = margin(t = 3.2)))   # 对齐森林区中点(右半是数值列);上边距用于与 B 的轴线齐平
+  theme(plot.title = element_text(margin = margin(l = AL, b = 1)),   # shift the letter right to align with letter C in the bottom row
+        axis.title.x = element_text(hjust = log(XHI / XLO) / (2 * log(XMAX / XLO)), margin = margin(t = 3.2)))   # centered on the forest area (the right half is the value column); the top margin aligns it with the axis of B
 
 QLV <- paste0("Q", 1:4)
 qhet_p <- function(w) { b <- log(w$hr); se <- (log(w$hi) - log(w$lo)) / (2 * qnorm(.975)); wt <- 1 / se^2   # Cochran Q,df = 3
   pchisq(sum(wt * (b - sum(wt * b) / sum(wt))^2), length(b) - 1, lower.tail = FALSE) }
-# ---- B:基础模型(年龄 + 性别 + PhenoAge 加速)与再加 KSAA 的 Harrell C、R²_D;右端标相对增幅 ----
-#   CI 来自 200 次 bootstrap,两模型在同一重抽样内重拟合(不是两条 CI 的端点相减)。
+# ---- B: Harrell's C and R²_D of the base model (age + sex + Phenotypic Age acceleration) and with KSAA added; relative gains on the right ----
+#   CIs from 200 bootstrap replicates, refitting both models in the same resample (not differences of the two CI limits).
 MC <- "Harrell\u2019s C"; MR <- "Explained variation, R\u00b2"
 mkb <- function(est, lo, hi, m, ser) data.frame(o = CI7$o, est = est, lo = lo, hi = hi, m = m, s = ser)
 LB2 <- rbind(mkb(CI7$C_pa, CI7$C_pa_lo, CI7$C_pa_hi, MC, PA), mkb(CI7$C_cb, CI7$C_cb_lo, CI7$C_cb_hi, MC, PK),
@@ -131,7 +131,7 @@ pd <- ggplot(LB2, aes(est, y, colour = s)) +
   scale_colour_manual(values = PAL[c(PA, PK)], name = NULL) + scale_shape_manual(values = SHP[c(PA, PK)], name = NULL) +
   scale_size_manual(values = SZ[c(PA, PK)], guide = "none") +
   scale_x_continuous(breaks = scales::breaks_pretty(3), labels = function(v) mi(formatC(v, format = "f", digits = 2)),
-                     expand = expansion(mult = c(0.10, 0.34))) +   # 右侧留出百分比的位置
+                     expand = expansion(mult = c(0.10, 0.34))) +   # room for the percentages on the right
   scale_y_continuous(breaks = 3:1, labels = OUT3, expand = c(0, 0)) +
   coord_cartesian(ylim = c(0.45, 3.75), clip = "off") +
   labs(title = "B", x = NULL, y = NULL) + thk +
@@ -146,7 +146,7 @@ stopifnot(nrow(LB) == 8)
 LB$y <- ifelse(LB$blk == 1, 9.4, 4.0) - (as.integer(factor(LB$stratum, QLV)) - 1)
 LB$txt <- hrtxt(LB$hr, LB$lo, LB$hi)
 PH <- sapply(c("main", "main_cvd"), function(tg) qhet_p(JW[JW$panel == tg, ]))
-if (Sys.getenv("KSAA_UNWEIGHTED") == "1") stopifnot(round(PH, 2) == c(0.57, 0.50))   # 与正文数值核对(不加权版)
+if (Sys.getenv("KSAA_UNWEIGHTED") == "1") stopifnot(round(PH, 2) == c(0.57, 0.50))   # check against the numbers in the text (unweighted version)
 HD <- data.frame(y = c(10.5, 5.1), lab = c("All-cause mortality", "Cardiovascular mortality"),
                  p = sprintf("P for heterogeneity = %s", f2(PH, 2)))
 pw <- fbase(LB, c(0.35, 11.2)) +
@@ -162,19 +162,19 @@ pw <- fbase(LB, c(0.35, 11.2)) +
        x = "HR per SD of KSAA (95% CI)", y = NULL) +
   theme(plot.subtitle = element_text(size = FS, colour = INK, margin = margin(b = 2)))
 
-# ---- C–E 交叉分格的 HR(参照格 Q1×Q1;以 log HR 着色,0.5 与 2 等距)----
+# ---- C–E: HRs of the cross-classified cells (reference Q1×Q1; colored by log HR, so 0.5 and 2 are equidistant) ----
 QL <- paste0("Q", 1:4)
 JC$y <- factor(JC$y, QL); JC$x <- factor(JC$x, QL)
-LIM <- log(5); BRK <- c(0.5, 1, 2, 4)   # 上限覆盖加权后最高格(心血管 Q4×Q4 = 4.49)
+LIM <- log(5); BRK <- c(0.5, 1, 2, 4)   # upper limit covers the highest weighted cell (cardiovascular Q4×Q4 = 4.49)
 FW <- as.numeric(Sys.getenv("FIG3_W", "6.27")); FH <- as.numeric(Sys.getenv("FIG3_H", "5.5")); R3 <- as.numeric(Sys.getenv("FIG3_R3", "0.62")); HM_ASP <- as.numeric(Sys.getenv("FIG3_ASP", "0"))
-stopifnot(max(abs(log(JC$hr))) < LIM)   # 两张热图共用色标,任何格子都不能超出
+stopifnot(max(abs(log(JC$hr))) < LIM)   # the heat maps share one color scale; no cell may exceed it
 JC$dark <- abs(log(JC$hr)) > 0.8
-HM_FS <- as.numeric(Sys.getenv("FIG3_HMFS", "4.2"))   # 热图的轴标签 / 轴标题 / 色标文字(主图其余部分仍为 FS = 5.2)
-HM_TY <- as.numeric(Sys.getenv("FIG3_HMTY", "0.97"))   # 面板字母的纵向位置(整张子图的 npc,1 = 顶端):越小越靠近热图
-HM_RM <- as.numeric(Sys.getenv("FIG3_HMRM", "12"))    # 热图右侧留白(pt):色标画在这里,数值同时决定 E 的右缘位置
-HM_LX <- as.numeric(Sys.getenv("FIG3_HMLX", "1.005"))  # 色标相对色块区右缘的位置(1 = 紧贴);太大会压到右邻面板的纵轴标题
-HM_RME <- as.numeric(Sys.getenv("FIG3_HMRME", "0"))   # E 的右留白:0 = 色块区铺到格子右缘(色标画到画布边距里,不被裁);负值无效,会被钳成 0
-heat <- function(tag, letter, outcome, showleg = FALSE, rm = HM_RM) {   # 两张热图共用同一色标,只在右图画一次
+HM_FS <- as.numeric(Sys.getenv("FIG3_HMFS", "4.2"))   # axis labels / axis titles / color-bar text of the heat maps (the rest of the figure stays at FS = 5.2)
+HM_TY <- as.numeric(Sys.getenv("FIG3_HMTY", "0.97"))   # vertical position of panel letters (npc of the whole panel, 1 = top): smaller is closer to the heat map
+HM_RM <- as.numeric(Sys.getenv("FIG3_HMRM", "12"))    # right margin of the heat maps (pt): the color bar goes here, and the value also sets the right edge of E
+HM_LX <- as.numeric(Sys.getenv("FIG3_HMLX", "1.005"))  # color-bar position relative to the right edge of the tiles (1 = adjacent); too large overlaps the y-axis title of the next panel
+HM_RME <- as.numeric(Sys.getenv("FIG3_HMRME", "0"))   # right margin of E: 0 = tiles extend to the right edge of the cell (the color bar is drawn in the canvas margin and not clipped); negative values are clamped to 0
+heat <- function(tag, letter, outcome, showleg = FALSE, rm = HM_RM) {   # the heat maps share one color scale, drawn once on the right map
   g <- JC[JC$panel == tag, ]
   ggplot(g, aes(x, y, fill = log(hr))) + geom_tile(colour = "white", linewidth = 0.8) +
     geom_text(aes(label = ifelse(ref, "1.00", f2(hr)), colour = dark), size = (FS - 2) / .pt, family = "Arial", fontface = "bold", vjust = -0.25) +
@@ -182,30 +182,30 @@ heat <- function(tag, letter, outcome, showleg = FALSE, rm = HM_RM) {   # 两张
     scale_fill_gradient2(low = BLUE, mid = "white", high = ORANGE, midpoint = 0, limits = c(-LIM, LIM), breaks = log(BRK), labels = c("0.5", "1", "2", "4"), name = "HR",
                          guide = if (showleg) "colourbar" else "none") +
     scale_colour_manual(values = c(`FALSE` = INK, `TRUE` = "white"), guide = "none") +
-    scale_x_discrete(expand = c(0, 0)) + scale_y_discrete(limits = QL, expand = c(0, 0)) +   # Q1 在底、Q4 在顶
-    annotate("text", x = 2.5, y = 4.5, label = outcome, vjust = -0.9, size = FS / .pt, family = "Arial", colour = INK) +   # 结局名对准色块区中心(subtitle 只占位)
+    scale_x_discrete(expand = c(0, 0)) + scale_y_discrete(limits = QL, expand = c(0, 0)) +   # Q1 at the bottom, Q4 at the top
+    annotate("text", x = 2.5, y = 4.5, label = outcome, vjust = -0.9, size = FS / .pt, family = "Arial", colour = INK) +   # outcome name centered on the tiles (subtitle is only a placeholder)
     coord_cartesian(clip = "off") +
     labs(tag = letter, subtitle = " ", x = "Phenotypic Age acceleration quartile", y = "KSAA quartile") + thk +
     theme(axis.line = element_blank(), panel.border = element_blank(), axis.ticks = element_blank(),
-          # 字母用 plot.tag 定位(plot.title 的负下边距会被 gtable 钳住);tag 不占版面,y 由 HM_TY 给
+          # letters are placed with plot.tag (gtable clamps a negative bottom margin of plot.title); the tag takes no space and its y is HM_TY
           plot.tag = element_text(size = 8, face = "bold", colour = INK, hjust = 0, vjust = 1),
           plot.tag.position = c(0.002, HM_TY), plot.tag.location = "plot",
           axis.text = element_text(colour = INK, size = HM_FS), axis.title = element_text(colour = INK, size = HM_FS),
           axis.title.x = element_text(margin = margin(t = 1)), axis.title.y = element_text(margin = margin(r = 1)),
           plot.subtitle = element_text(size = FS, margin = margin(b = 3)),
-          # 色标作为 inside 图例画在色块区右侧空白里,不占版面
+          # color bar drawn as an inside legend in the space right of the tiles, taking no layout space
           legend.position = "inside", legend.position.inside = c(HM_LX, 0.5), legend.justification.inside = c(0, 0.5), legend.direction = "vertical",
-          plot.margin = margin(2, rm, 1, 2),   # 右侧给色标留位(否则被裁);E 用更小的值,使色标右缘与 B 的横轴右端齐
+          plot.margin = margin(2, rm, 1, 2),   # room on the right for the color bar (otherwise clipped); E uses a smaller value so the color bar ends at the right end of the x axis of B
           legend.title = element_text(size = HM_FS, colour = INK, margin = margin(b = 2)), legend.text = element_text(size = HM_FS, colour = INK),
           legend.key.width = unit(3.5, "pt"), legend.key.height = unit(10, "pt"), legend.ticks.length = unit(1, "pt")) +
-    # 默认不设纵横比(HM_ASP = 0):面板铺满格子,左右缘可直接算以与 B 对齐;方格形状由行高 R3 控制。
+    # no aspect ratio by default (HM_ASP = 0): the panel fills its cell so the left/right edges can be computed to align with B; tile shape is set by the row height R3.
     (if (HM_ASP > 0) theme(aspect.ratio = HM_ASP) else NULL)
 }
 pe <- heat("main", "C", "All-cause mortality", showleg = TRUE)
 pf <- heat("main_cvd", "D", "Cardiovascular mortality", showleg = TRUE)
 pg <- heat("main_cancer", "E", "Cancer mortality", showleg = TRUE, rm = HM_RME)
 
-# 图例:用一张只为出图例的小图生成,取出图例 grob 单独放在最上方一行;不用 patchwork 的 guides = "collect"(会把热图色标一并收走)
+# Legend: made from a small plot drawn only for its legend, whose grob is placed alone in the top row; patchwork's guides = "collect" is not used (it would also collect the heat-map color bar)
 leg_grob <- function(lv, sizes, w) {
   LG <- data.frame(series = factor(lv, lv), x = seq_along(lv), y = 1)
   pl <- ggplot(LG, aes(x, y, colour = series, shape = series)) + geom_point() + scale_colour_manual(values = PAL[lv], name = NULL) + scale_shape_manual(values = SHP[lv], name = NULL) + thk +
@@ -214,31 +214,31 @@ leg_grob <- function(lv, sizes, w) {
   gl$grobs[[grep("guide-box-top", gl$layout$name)]]
 }
 NOLEG <- theme(legend.position = "none")
-FH <- as.numeric(Sys.getenv("FIG3_H", "3.6"))   # 两行;热图不固定纵横比时行高即色块区高度
-# pw(各 PhenoAge 四分位内 KSAA 的 HR)只计算不入图,异质性 P 供正文引用。
-# A、B 各自 wrap_elements 独立排版:否则 patchwork 对齐同一行的轴区,A 的轴线会与面板脱开。
+FH <- as.numeric(Sys.getenv("FIG3_H", "3.6"))   # two rows; without a fixed aspect ratio the row height is the height of the tiles
+# pw (HR of KSAA within each PhenoAge quartile) is computed but not plotted; its heterogeneity P is cited in the text.
+# A and B are each laid out with wrap_elements: otherwise patchwork aligns the axis areas in the row and the axis of A detaches from its panel.
 toprow <- wrap_elements(full = pc + NOLEG) + wrap_elements(full = pd + NOLEG) + plot_layout(widths = c(1.15, 1.25))
-BL <- as.numeric(Sys.getenv("FIG3_BL", "0.11")); BR <- as.numeric(Sys.getenv("FIG3_BR", "0"))   # 左右留白:C 左缘对齐 A 的纵轴、E 右缘对齐 B 的横轴右端
-botrow <- plot_spacer() + pe + pf + pg + plot_spacer() + plot_layout(widths = c(BL, 1, 1, 1, BR))   # 三张热图并排(癌症格事件数少、CI 宽)
+BL <- as.numeric(Sys.getenv("FIG3_BL", "0.11")); BR <- as.numeric(Sys.getenv("FIG3_BR", "0"))   # left/right margins: left edge of C aligned with the y axis of A, right edge of E with the right end of the x axis of B
+botrow <- plot_spacer() + pe + pf + pg + plot_spacer() + plot_layout(widths = c(BL, 1, 1, 1, BR))   # three heat maps side by side (cancer cells have few events and wide CIs)
 p <- wrap_plots(L = wrap_elements(full = leg_grob(c(PA, KS, PK), c(1.6, 1.5, 1.9), FW)), A = wrap_elements(full = toprow), B = wrap_elements(full = botrow),
                 design = "L\nA\nB", heights = c(.06, .68, R3)) +
   plot_annotation(theme = theme(plot.margin = margin(4, 4, 4, 4)))
-ggsave(tempfile(fileext = ".png"), p, width = FW, height = FH, dpi = 300, bg = "white")   # 热身渲染(本机首次渲染文字尺寸会量错,见图 2 脚本)
+ggsave(tempfile(fileext = ".png"), p, width = FW, height = FH, dpi = 300, bg = "white")   # warm-up render (the first render measures text sizes wrongly on this machine; see the Figure 2 script)
 save_fig(p, "Figure3", FW, FH)
 
-cat("\n面板数值(n = 4,522;合并评分为表观值,未做乐观校正)\n")
-for (i in seq_len(nrow(CI7))) with(CI7[i, ], cat(sprintf("  a %-15s C PhenoAge %.4f -> 合并 %.4f  ΔC %+.4f (%+.4f, %+.4f)  相对 %+.2f%% (%+.2f%%, %+.2f%%)\n",
+cat("\nPanel values (n = 4,522; combined-score values are apparent, without optimism correction)\n")
+for (i in seq_len(nrow(CI7))) with(CI7[i, ], cat(sprintf("  a %-15s C PhenoAge %.4f -> combined %.4f  ΔC %+.4f (%+.4f, %+.4f)  relative %+.2f%% (%+.2f%%, %+.2f%%)\n",
   as.character(o), C_pa, C_cb, dC_vs_pa, dC_vs_pa_lo, dC_vs_pa_hi, relC, relC_lo, relC_hi)))
-for (i in seq_len(nrow(CI7))) with(CI7[i, ], cat(sprintf("  b %-15s R²_D PhenoAge %.3f -> 合并 %.3f  相对 %+.1f%% (%+.1f%%, %+.1f%%)\n",
+for (i in seq_len(nrow(CI7))) with(CI7[i, ], cat(sprintf("  b %-15s R²_D PhenoAge %.3f -> combined %.3f  relative %+.1f%% (%+.1f%%, %+.1f%%)\n",
   as.character(o), R2_pa, R2_cb, relR2, relR2_lo, relR2_hi)))
-for (i in which(IMP$metric == "per_sd")) with(IMP[i, ], cat(sprintf("  c %-15s 改善 %+.1f%% (%+.1f%%, %+.1f%%)\n", as.character(o), pct, pct_lo, pct_hi)))
+for (i in which(IMP$metric == "per_sd")) with(IMP[i, ], cat(sprintf("  c %-15s gain %+.1f%% (%+.1f%%, %+.1f%%)\n", as.character(o), pct, pct_lo, pct_hi)))
 for (i in seq_len(nrow(WD))) with(WD[i, ], cat(sprintf("  d %-15s KSAA %s | PhenoAge %s | Wald P %.2g\n", as.character(o),
   ci(hr_ksaa, lo_ksaa, hi_ksaa), ci(hr_pa, lo_pa, hi_pa), p_diff)))
-qhet <- function(w) { b <- log(w$hr); se <- (log(w$hi) - log(w$lo)) / (2 * qnorm(.975)); wt <- 1 / se^2   # 四档内 KSAA 每 SD HR 的异质性(Cochran Q,df = 3)
+qhet <- function(w) { b <- log(w$hr); se <- (log(w$hi) - log(w$lo)) / (2 * qnorm(.975)); wt <- 1 / se^2   # heterogeneity of the per-SD HR of KSAA across the four quartiles (Cochran Q, df = 3)
   Q <- sum(wt * (b - sum(wt * b) / sum(wt))^2); c(Q = Q, p = pchisq(Q, length(b) - 1, lower.tail = FALSE)) }
 for (tg in c("main", "main_cvd")) { g <- JC[JC$panel == tg, ]; w <- JW[JW$panel == tg, ]
-  h <- qhet(w); cat(sprintf("  %s 四档异质性 Cochran Q = %.2f, P = %.2f\n", if (tg == "main") "e" else "f", h[["Q"]], h[["p"]]))
+  h <- qhet(w); cat(sprintf("  %s heterogeneity across quartiles Cochran Q = %.2f, P = %.2f\n", if (tg == "main") "e" else "f", h[["Q"]], h[["p"]]))
   q4 <- g[g$y == "Q4" & g$x == "Q4", ]
-  cat(sprintf("  %s %-9s Q1×Q1 %s,Q4×Q4 %s,参照格 Q1×Q1;每格 %d–%d 人、死亡 %d–%d;各档内 KSAA 每 SD:%s\n",
-              if (tg == "main") "e" else "f", if (tg == "main") "全因" else "心血管", f2(g$hr[g$y == "Q1" & g$x == "Q1"]),
+  cat(sprintf("  %s %-9s Q1×Q1 %s, Q4×Q4 %s, reference Q1×Q1; %d–%d participants and %d–%d deaths per cell; KSAA per SD within quartiles: %s\n",
+              if (tg == "main") "e" else "f", if (tg == "main") "all-cause" else "cardiovascular", f2(g$hr[g$y == "Q1" & g$x == "Q1"]),
               ci(q4$hr, q4$hr_lo, q4$hr_hi), min(g$n), max(g$n), min(g$deaths), max(g$deaths), paste(ci(w$hr, w$lo, w$hi), collapse = " / "))) }

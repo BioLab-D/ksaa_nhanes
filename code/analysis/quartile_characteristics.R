@@ -1,6 +1,6 @@
-# 按膝龄差四分位的基线特征(表 S3 与表 1 使用):均数 / 百分比未加权;P 值为设计检验 —— 分类变量 Rao–Scott F(svychisq),
-#   连续变量设计 Kruskal–Wallis(svyranktest);设计建在全部成人体检者上、研究样本取 domain(weighted_common.R),K–L 判读用第二期设计。
-# 输入 results/analysis/analysis_data.rds、fxf_vars.csv(weighted_common.R 读取)。由 run_all.sh 运行;输出 quartile_characteristics.csv
+# Baseline characteristics by knee age gap quartile (used by Table S3 and Table 1): unweighted means / percentages; design-based P values: Rao–Scott F (svychisq) for categorical,
+#   design-based Kruskal–Wallis (svyranktest) for continuous variables; design on all adult examinees with the cohort as a domain (weighted_common.R), phase 2 design for the K–L reading.
+# Input results/analysis/analysis_data.rds, fxf_vars.csv (read by weighted_common.R). Run by run_all.sh; output quartile_characteristics.csv
 res <- here::here("results"); out <- file.path(res, "analysis")
 d <- readRDS(file.path(out, "analysis_data.rds"))
 qc <- quantile(d$gap, 0:4 / 4)
@@ -10,10 +10,10 @@ f <- function(x, dg = 1) mi_(sub("^-(0\\.0+)$", "\\1", formatC(round(x + sign(x)
 cm <- function(x) formatC(round(x), format = "d", big.mark = ",")
 fp <- function(p) ifelse(is.na(p), "", ifelse(p < 0.001, "&lt;0.001", formatC(p, format = "f", digits = 3)))
 
-WP <- local({   # 设计检验的 P 值(按变量名);缺失值所在者不进入该变量的 domain
+WP <- local({   # design-based P values (by variable name); participants missing a variable are excluded from its domain
   source(here::here("code", "analysis", "weighted_common.R"), local = TRUE)
   D6 <- update(D6, q = factor(q, QL), sexf = factor(HSSEX), racef = factor(DMARETHN)); D2 <- update(D2, q = factor(q, QL))
-  stopifnot(all(F$HSSEX[F$inc] == F$sex[F$inc]), all(F$DMARETHN[F$inc] == F$race[F$inc]))   # NHANES 原变量与队列变量一致
+  stopifnot(all(F$HSSEX[F$inc] == F$sex[F$inc]), all(F$DMARETHN[F$inc] == F$race[F$inc]))   # original NHANES variables agree with cohort variables
   kw <- function(v) svyranktest(as.formula(paste(v, "~ q")), dom6(F$inc & !is.na(F[[v]])), test = "KruskalWallis")$p.value[[1]]
   rs <- function(v, ok = F[[v]], des = dom6) svychisq(as.formula(paste("~", v, "+ q")), des(F$inc & !is.na(ok)), statistic = "F")$p.value[[1]]
   c(sapply(c(age = "age", bmi = "bmi", tc = "tc", hdl = "hdl", egfr = "egfr", pa_accel = "pa_accel", fn_bmd = "fn_bmd", tot_bmd = "tot_bmd", gait = "gait"), kw),
@@ -21,9 +21,9 @@ WP <- local({   # 设计检验的 P 值(按变量名);缺失值所在者不进�
     sapply(c(edu3 = "edu3", poor = "poor", smk3 = "smk3", alc3 = "alc3", pa3 = "pa3", htn = "htn", dm = "dm", cvd_hist = "cvd_hist",
              cancer_hist = "cancer_hist", pain = "pain", anylimit = "anylimit", fx_hip = "fx_hip", fx_any = "fx_any", fall = "fall"), rs),
     oa = rs("oa", des = dom2))
-}); cat("设计检验 P 值:", paste(sprintf("%s %.3g", names(WP), WP), collapse = "; "), "\n")
+}); cat("Design-based P values:", paste(sprintf("%s %.3g", names(WP), WP), collapse = "; "), "\n")
 
-cat("=========== 按膝龄差四分位的基线特征(P 值为设计检验)===========\n")
+cat("=========== Baseline characteristics by knee age gap quartile (design-based P values) ===========\n")
 QL <- levels(d$q); T <- list()
 addr <- function(lab, type, ind, cells, p) T[[length(T) + 1]] <<- data.frame(lab = lab, type = type, ind = ind, overall = cells[1], Q1 = cells[2], Q2 = cells[3], Q3 = cells[4], Q4 = cells[5], p = p)
 by_q <- function(fun, x) c(fun(x), sapply(QL, function(l) fun(x[d$q == l])))
@@ -49,11 +49,11 @@ rowcat("Alcohol use<sup>b</sup>", "alc3", c(never = "Never", former_light = "For
 rowcat("Leisure-time physical activity<sup>b</sup>", "pa3", c(active = "Active", insufficient = "Insufficiently active", inactive = "Inactive"))
 rowc("Body mass index, kg/m²", "bmi")
 hdr("Cardiometabolic factors and disease history")
-# 胆固醇报 SI 单位(mmol/L = mg/dL ÷ 38.67);模型协变量 tc / hdl 仍为 mg/dL
+# cholesterol reported in SI units (mmol/L = mg/dL ÷ 38.67); model covariates tc / hdl stay in mg/dL
 d$tc_mmol <- d$tc / 38.67; d$hdl_mmol <- d$hdl / 38.67
 rowb("Hypertension<sup>b</sup>", d$htn, key = "htn"); rowb("Diabetes<sup>b</sup>", d$dm, key = "dm"); rowc("Total cholesterol, mmol/L", "tc_mmol", 2, key = "tc"); rowc("HDL cholesterol, mmol/L", "hdl_mmol", 2, key = "hdl")
 rowc("eGFR, mL/min/1.73 m²<sup>b</sup>", "egfr", 1); rowb("Self-reported history of cardiovascular disease<sup>b</sup>", d$cvd_hist, key = "cvd_hist"); rowb("Self-reported history of cancer<sup>b</sup>", d$cancer_hist, key = "cancer_hist")
-rowc("Phenotypic Age acceleration, years<sup>c</sup>", "pa_accel", key = "pa_accel")   # 1 / 99 百分位缩尾值(与回归一致)
+rowc("Phenotypic Age acceleration, years<sup>c</sup>", "pa_accel", key = "pa_accel")   # winsorized at the 1st / 99th percentiles (as in the regressions)
 hdr("Musculoskeletal status")
 rowc("Femoral neck BMD, g/cm²<sup>d</sup>", "fn_bmd", 3); rowc("Total hip BMD, g/cm²<sup>d</sup>", "tot_bmd", 3)
 rowb("Radiographic knee OA<sup>e</sup>", d$oa, key = "oa"); rowb("Knee pain", d$pain, key = "pain"); rowc("Gait speed, m/s", "gait", 2)

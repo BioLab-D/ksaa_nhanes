@@ -1,8 +1,8 @@
-"""把全部 4,908 张膝片转成 1024px 8-bit PNG,作为检测器输入。
+"""Convert all 4,908 knee films to 1024-px 8-bit PNGs as detector input.
 
-窗宽只用组织像素统计:直曝背景和铅标记已饱和到 65535,
-纳入分位数会把骨与软组织压到很窄的灰阶里。
-已存在的跳过(前面 800 张候选已生成)。
+The window uses tissue-pixel statistics only: direct-exposure background and lead markers are saturated at 65535,
+and including them in the percentiles would squeeze bone and soft tissue into a narrow grey range.
+Existing files are skipped (the first 800 candidates were already generated).
 """
 import os, glob, sys, numpy as np
 from multiprocessing import Pool
@@ -29,7 +29,7 @@ def one(p):
 
 if __name__ == "__main__":
     files = sorted(glob.glob(DIR+"/*.tiff"))
-    print(f"总片数 {len(files)}  已存在 {len(glob.glob(OUT+'/*.png'))}", flush=True)
+    print(f"total films {len(files)}  existing {len(glob.glob(OUT+'/*.png'))}", flush=True)
     with Pool(12) as pool:
         r = pool.map(one, files, chunksize=8)
     from collections import Counter
@@ -37,4 +37,4 @@ if __name__ == "__main__":
     print(dict(c), flush=True)
     for x in r:
         if x not in ("ok","skip"): print(" ", x, flush=True)
-    print(f"最终 PNG 数: {len(glob.glob(OUT+'/*.png'))}", flush=True)
+    print(f"final PNG count: {len(glob.glob(OUT+'/*.png'))}", flush=True)

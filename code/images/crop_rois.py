@@ -1,11 +1,11 @@
-"""按检测框从原始 16-bit TIFF 裁高分辨率膝关节 ROI。
+"""Crop high-resolution knee ROIs from the original 16-bit TIFFs using the detection boxes.
 
-存 16-bit 而非窗宽后的 8-bit:重裁一遍要把 4,908 张 38MB 的 TIFF 全部重读
-(约 1 小时),而磁盘有 2.9TB 余量。保留原始动态范围,把"用什么窗宽"这个
-下游还会反复调的决定留到训练时再做,不锁死在预处理里。
+ROIs are saved as 16-bit rather than windowed 8-bit: re-cropping means re-reading all 4,908 38-MB TIFFs
+(about 1 hour), and the disk has 2.9 TB free. Keeping the full dynamic range leaves the choice of window,
+which is tuned repeatedly downstream, to training time instead of fixing it in preprocessing.
 
-框外扩 1.15 倍留少量解剖上下文;超出片边的用 edge 填充而非补零,
-避免在 ROI 边缘制造人工的强梯度。
+The box is enlarged 1.15 × to keep some anatomical context; areas beyond the film edge are edge-padded rather than zero-padded
+to avoid artificial strong gradients at the ROI border.
 """
 import os, csv, numpy as np
 from multiprocessing import Pool
@@ -46,7 +46,7 @@ def one(stem):
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     stems = sorted(boxes)
-    print(f"待裁 {len(stems)} 张片 / {sum(len(v) for v in boxes.values())} 个膝", flush=True)
+    print(f"{len(stems)} films / {sum(len(v) for v in boxes.values())} knees to crop", flush=True)
     with Pool(12) as pool:
         res = pool.map(one, stems, chunksize=8)
     flat = [x for sub in res for x in sub]

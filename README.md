@@ -179,5 +179,3 @@ All inputs derive from public-use files of the National Center for Health Statis
 - `code/model/mammo_age_model.py`, `transformer.py`, `probordiloss.py`, `mean_variance_loss.py` and `metrics.py` are from the official Mammo-AGE implementation (Apache License 2.0, `code/model/LICENSE_Mammo-AGE`). In `mammo_age_model.py` and `transformer.py` the number of views (`N_VIEWS`; 2 knees instead of 4 mammographic views), the global dropout rate (`DROP`) and the import path were changed; the other three files are unchanged.
 - Knee detection uses Ultralytics YOLO11 (AGPL-3.0) as an installed dependency; no Ultralytics code or detector weights are included.
 - NHANES data are in the public domain.
-
-Many code comments are in Chinese.

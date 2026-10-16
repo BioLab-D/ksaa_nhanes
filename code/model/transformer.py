@@ -2,7 +2,7 @@
 import os
 import torch
 import torch.nn as nn
-N_VIEWS = int(os.environ.get("N_VIEWS", "2"))   # 移植:视图数(乳腺 4,膝/手 2)
+N_VIEWS = int(os.environ.get("N_VIEWS", "2"))   # port: number of views (4 for mammography, 2 for knees/hands)
 from torch import Tensor
 
 

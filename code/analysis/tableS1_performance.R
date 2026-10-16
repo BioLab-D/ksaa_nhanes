@@ -1,5 +1,5 @@
 # Table S1: age-prediction performance of the five pre-specified backbones and their weighted ensemble; plus performance by subgroup (reference only, not in the manuscript).
-# 输出 results/tableS1_performance.xlsx(工作表名为 Table 2 / Table S2)与 results/work/{t2,s2}_en*.csv。
+# Output results/tableS1_performance.xlsx (sheets named Table 2 / Table S2) and results/work/{t2,s2}_en*.csv.
 # All models share one participant-level fold split (sorted SEQN strings, random.seed(20260831), i %% 5; verified 4,872/4,872).
 res <- here::here("results")
 sp  <- here::here("results", "work")
@@ -7,7 +7,7 @@ suppressMessages(library(openxlsx))
 B <- read.csv(file.path(res,"ksaa_oof.csv")); age <- B$age; fold <- B$fold; K <- 0:4
 sl <- read.csv(file.path(res, "work", "surv_labels.csv")); ii <- match(B$SEQN, sl$SEQN); B$sex <- sl$sex[ii]; B$race <- sl$race[ii]; B$phase <- sl$phase[ii]
 al <- function(f){ x <- read.csv(f); v <- x$pred_age[match(B$SEQN, x$SEQN)]; stopifnot(!anyNA(v)); v }
-V2 <- Sys.getenv("V2","0")=="1"   # V2=1 读膝适配版 results/predictions/(4,875 人)
+V2 <- Sys.getenv("V2","0")=="1"   # V2=1 reads the knee-adapted version in results/predictions/ (4,875 participants)
 MV <- file.path(res,"mammo_mv")
 mv <- function(a, lr=FALSE) al(file.path(MV, sprintf("off_448%s_%s_oof.csv", if(lr) "lr" else "", a)))
 v2 <- function(a) al(file.path(res, "predictions", sprintf("m4_%s_oof.csv", a)))
@@ -27,9 +27,9 @@ met <- function(p){ m <- sapply(K, function(k){ j <- fold==k; e <- p[j]-age[j]; 
 T2 <- do.call(rbind, lapply(M, function(x) if(!is.null(x$g)) data.frame(lab=x$g, mae="", cs="", r="", rs="", type="hdr", bold=FALSE)
                                            else { v <- met(x$p); data.frame(lab=x$l, mae=v[1], cs=v[2], r=v[3], rs=v[4], type="row", bold=isTRUE(x$bold)) }))
 chk <- T2[T2$type=="row", c("lab","mae")]
-# 核对值从 ksaa_ensemble_log.txt 读取,不写死
+# check values are read from ksaa_ensemble_log.txt, not hard-coded
 kas <- readLines(file.path(res,"ksaa_ensemble_log.txt")); ref <- function(lab) sub("^.*MAE ([0-9.]+ ± [0-9.]+).*$", "\\1", grep(lab, kas, value=TRUE, fixed=TRUE)[1])
-cat(sprintf("核对(应等于 ksaa_ensemble_log.txt:raw %s / 校正后 %s):\n", ref("Ensemble (raw)"), ref("Ensemble (bias-corrected)"))); print(tail(chk, 7), row.names=FALSE)
+cat(sprintf("Check (should equal ksaa_ensemble_log.txt: raw %s / corrected %s):\n", ref("Ensemble (raw)"), ref("Ensemble (bias-corrected)"))); print(tail(chk, 7), row.names=FALSE)
 stopifnot(tail(chk$mae,1)==ref("Ensemble (bias-corrected)"), chk$mae[nrow(chk)-1]==ref("Ensemble (raw)"))
 T2_notes <- c(
   paste0("The five backbones were pre-specified following the Mammo-AGE protocol. Both knees of each participant were entered jointly and fused by the Mammo-AGE instance-bag transformer (448 × 448 pixels), trained with a probabilistic ordinal embedding head and mean–variance loss. Metrics were computed in each held-out fold of participant-level five-fold cross-fitting and are reported as mean ± SD across folds (n = ", N, ")."),

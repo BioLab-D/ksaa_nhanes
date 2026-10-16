@@ -1,14 +1,14 @@
-# KSAA 与 PhenoAge 加速:正面比较(第 1 段)与 PhenoAge + KSAA 合并评分(第 2 段)。
-.fresh_rng <- function() { RNGkind("default", "default", "default")   # 每段开始时恢复新 R 进程的随机数状态
+# KSAA and PhenoAge acceleration: head-to-head comparison (part 1) and combined PhenoAge + KSAA score (part 2).
+.fresh_rng <- function() { RNGkind("default", "default", "default")   # reset the RNG to the state of a fresh R session at the start of each part
   if (exists(".Random.seed", envir = globalenv())) rm(".Random.seed", envir = globalenv()) }
 
-# ======== R6:KSAA 与 PhenoAge 加速的正面比较(同时入模 + 系数差 Wald 检验) ========
+# ======== R6: head-to-head comparison of KSAA and PhenoAge acceleration (joint model + Wald test of the coefficient difference) ========
 .fresh_rng(); local({
-# R6:KSAA 与 PhenoAge 加速的正面比较(同时入模 + 系数差 Wald 检验)
-# 设计参照 Chen et al. Cell Rep Methods 2025;5:101115 图 5D。
-# 样本 = pa_accel 可得者(n = 4,522),两个测度各自在该样本内标准化,调整年龄 + 性别。
-#   D 面板:两者同时入模,对两系数之差做 Wald 检验(联合协方差,计入两者相关)
-# 输入 results/analysis/analysis_data.rds;输出 results/analysis/phenoage_wald.csv
+# R6: head-to-head comparison of KSAA and PhenoAge acceleration (joint model + Wald test of the coefficient difference)
+# Design follows Chen et al. Cell Rep Methods 2025;5:101115, Fig. 5D.
+# Sample = participants with pa_accel (n = 4,522); each measure standardized within this sample; adjusted for age + sex.
+#   Panel D: both in one model, Wald test of the difference between the two coefficients (joint covariance, accounts for their correlation)
+# Input results/analysis/analysis_data.rds; output results/analysis/phenoage_wald.csv
 suppressMessages(library(survival))
 res <- here::here("results"); out <- file.path(res, "analysis")
 d <- readRDS(file.path(out, "analysis_data.rds"))
@@ -18,11 +18,11 @@ s <- d[!is.na(d$pa_accel), ]
 sdz <- function(x) (x - mean(x)) / sd(x)
 s$zg <- sdz(s$gap); s$zm <- sdz(s$pa_accel)
 EV <- c("All-cause mortality" = "e", "CVD mortality" = "e_cvd", "Cancer mortality" = "e_cancer")
-cat(sprintf("样本 n = %d;KSAA SD = %.2f y,PhenoAge 加速 SD = %.2f y;r = %.3f\n\n",
+cat(sprintf("Sample n = %d; KSAA SD = %.2f y, PhenoAge acceleration SD = %.2f y; r = %.3f\n\n",
             nrow(s), sd(s$gap), sd(s$pa_accel), cor(s$gap, s$pa_accel)))
 
-# ---------- D 面板:同时入模 + 两系数之差的 Wald 检验 ----------
-cat("\n=========== D. 两者同时入模(每 SD),并检验两个 log HR 之差 ===========\n")
+# ---------- Panel D: joint model + Wald test of the difference between the two coefficients ----------
+cat("\n=========== D. Both in one model (per SD), testing the difference between the two log HRs ===========\n")
 WD <- NULL
 for (o in names(EV)) {
   j <- coxph(as.formula(sprintf("Surv(t, %s) ~ zg + zm + age + factor(sex)", EV[o])), s)
@@ -35,19 +35,19 @@ for (o in names(EV)) {
     ratio = exp(dif), ratio_lo = exp(dif - 1.96 * sed), ratio_hi = exp(dif + 1.96 * sed), z = z, p_diff = p))
 }
 write.csv(WD, file.path(out, "phenoage_wald.csv"), row.names = FALSE)
-for (i in seq_len(nrow(WD))) with(WD[i, ], cat(sprintf("  %-20s n %4d 事件 %4d | KSAA %.2f (%.2f–%.2f) | PhenoAge %.2f (%.2f–%.2f) | 比值 %.2f (%.2f–%.2f) Wald P %s\n",
+for (i in seq_len(nrow(WD))) with(WD[i, ], cat(sprintf("  %-20s n %4d events %4d | KSAA %.2f (%.2f–%.2f) | PhenoAge %.2f (%.2f–%.2f) | ratio %.2f (%.2f–%.2f) Wald P %s\n",
   outcome, n, events, hr_ksaa, lo_ksaa, hi_ksaa, hr_pa, lo_pa, hi_pa, ratio, ratio_lo, ratio_hi, fp(p_diff))))
-cat(sprintf("\n  注:比值 = KSAA HR / PhenoAge HR(同一模型内);Wald 检验用联合协方差,已计入两者相关(r = %.2f)\n", cor(s$gap, s$pa_accel)))
+cat(sprintf("\n  Note: ratio = KSAA HR / PhenoAge HR (same model); the Wald test uses the joint covariance and accounts for their correlation (r = %.2f)\n", cor(s$gap, s$pa_accel)))
 cat("\n-> phenoage_wald.csv\n")
 })
 
-# ======== R7:PhenoAge 单独 vs PhenoAge + KSAA 合并评分(每 SD / 分类 HR、C 与 R²_D、改善的 bootstrap CI) ========
+# ======== R7: PhenoAge alone vs combined PhenoAge + KSAA score (HR per SD / by category, C and R²_D, bootstrap CI of the improvement) ========
 .fresh_rng(); local({
-# R7:PhenoAge 单独 vs PhenoAge + KSAA 合并评分(每 SD / 分类 HR、C 与 R²_D、改善的 bootstrap CI)
-# 结构参照 Chen et al. Cell Rep Methods 2025;5:101115 图 5A–C。KSAA 单独评分也算出,仅备查。
-# 评分 = Surv ~ 标志物 + 年龄 + 性别 模型中标志物部分的线性组合,标准化为 SD = 1 后作为单一变量入模。
-# 合并权重在同一批人里估计(表观值,未做乐观校正),故改善须带 CI:每次 bootstrap 重抽都重估合并权重、重定分位切点。
-# 样本 = pa_accel 可得者 n = 4,522。输入 results/analysis/analysis_data.rds;输出 phenoage_combined_scores.csv、phenoage_combined_cindex.csv、phenoage_combined_improvement.csv
+# R7: PhenoAge alone vs combined PhenoAge + KSAA score (HR per SD / by category, C and R²_D, bootstrap CI of the improvement)
+# Structure follows Chen et al. Cell Rep Methods 2025;5:101115, Fig. 5A–C. A KSAA-only score is also computed, for reference only.
+# Score = linear combination of the marker terms in a Surv ~ markers + age + sex model, standardized to SD = 1 and entered as a single variable.
+# Combination weights are estimated in the same participants (apparent values, no optimism correction), so improvements need CIs: each bootstrap resample re-estimates the weights and the quantile cut points.
+# Sample = participants with pa_accel, n = 4,522. Input results/analysis/analysis_data.rds; outputs phenoage_combined_scores.csv, phenoage_combined_cindex.csv, phenoage_combined_improvement.csv
 suppressMessages({library(survival); library(parallel)})
 RNGkind("L'Ecuyer-CMRG"); set.seed(20260915); NC <- max(1, detectCores() - 1); B <- 200
 res <- here::here("results"); out <- file.path(res, "analysis")
@@ -57,14 +57,14 @@ s <- d[!is.na(d$pa_accel), ]
 EV <- c("All-cause mortality" = "e", "CVD mortality" = "e_cvd", "Cancer mortality" = "e_cancer")
 SCORE <- list("Phenotypic Age" = "pa_accel", "KSAA" = "gap", "Phenotypic Age + KSAA" = c("pa_accel", "gap"))
 ADJ <- "age + factor(sex)"
-cat(sprintf("样本 n = %d;KSAA SD %.2f y,PhenoAge 加速 SD %.2f y,r = %.3f\n", nrow(s), sd(s$gap), sd(s$pa_accel), cor(s$gap, s$pa_accel)))
+cat(sprintf("Sample n = %d; KSAA SD %.2f y, PhenoAge acceleration SD %.2f y, r = %.3f\n", nrow(s), sd(s$gap), sd(s$pa_accel), cor(s$gap, s$pa_accel)))
 
-mkscore <- function(dat, ev, vars) {   # 系数在 dat 内估计,只取标志物部分的线性组合
+mkscore <- function(dat, ev, vars) {   # coefficients estimated in dat; only the marker part of the linear predictor
   m <- coxph(as.formula(sprintf("Surv(t, %s) ~ %s + %s", ev, paste(vars, collapse = " + "), ADJ)), dat)
   z <- as.numeric(as.matrix(dat[, vars, drop = FALSE]) %*% coef(m)[vars])
   (z - mean(z)) / sd(z)
 }
-hr_sd_of <- function(dat, ev) {        # dat 需已有 sc 列
+hr_sd_of <- function(dat, ev) {        # dat must already have an sc column
   m <- summary(coxph(as.formula(sprintf("Surv(t, %s) ~ sc + %s", ev, ADJ)), dat))$coefficients["sc", ]
   b <- as.numeric(m["coef"]); se <- as.numeric(m["se(coef)"]); c(hr = exp(b), lo = exp(b - 1.96 * se), hi = exp(b + 1.96 * se))
 }
@@ -81,7 +81,7 @@ hr_cat_of <- function(dat, ev, scheme) {
   c(hr = exp(b), lo = exp(b - 1.96 * se), hi = exp(b + 1.96 * se), ntop = sum(ss$cg == "top"), nref = sum(ss$cg == "mid"))
 }
 
-# ---------- 每 SD 的 HR 与分类 HR(三个评分都算)----------
+# ---------- HR per SD and by category (all three scores) ----------
 S <- NULL
 for (o in names(EV)) { ev <- EV[[o]]
   for (sn in names(SCORE)) {
@@ -96,8 +96,8 @@ for (o in names(EV)) { ev <- EV[[o]]
 }
 write.csv(S, file.path(out, "phenoage_combined_scores.csv"), row.names = FALSE)
 
-# ---------- 判别力 + 解释变异 ----------
-# Royston–Sauerbrei R²_D(survival::royston 的 R.D),与 C 同为整个模型的量,在同一次重抽里同算;相对增幅 = 合并 / PhenoAge − 1(%)
+# ---------- Discrimination + explained variation ----------
+# Royston–Sauerbrei R²_D (R.D of survival::royston), like C a whole-model quantity, computed in the same resample; relative gain = combined / PhenoAge − 1 (%)
 cfit <- function(dat, ev) {
   f <- lapply(SCORE, function(v) coxph(as.formula(sprintf("Surv(t, %s) ~ %s + %s", ev, paste(v, collapse = " + "), ADJ)), dat))
   c(setNames(sapply(f, function(m) concordance(m)$concordance), c("C_pa", "C_ks", "C_cb")),
@@ -124,7 +124,7 @@ for (o in names(EV)) { ev <- EV[[o]]
 rownames(C) <- NULL
 write.csv(C, file.path(out, "phenoage_combined_cindex.csv"), row.names = FALSE)
 
-# ---------- 改善(合并 / PhenoAge)的 bootstrap CI:每次重抽都重估权重、重定切点 ----------
+# ---------- Bootstrap CI of the improvement (combined / PhenoAge): each resample re-estimates the weights and cut points ----------
 one_boot <- function(x, ev) {
   x$sc <- mkscore(x, ev, SCORE[[1]])
   a_sd <- hr_sd_of(x, ev)[["hr"]]; a_95 <- hr_cat_of(x, ev, "p95")[["hr"]]; a_q5 <- hr_cat_of(x, ev, "q5")[["hr"]]
@@ -144,17 +144,17 @@ for (o in names(EV)) { ev <- EV[[o]]
 }
 write.csv(IMP, file.path(out, "phenoage_combined_improvement.csv"), row.names = FALSE)
 
-cat("\n=========== A. 判别力(Harrell C,年龄 + 性别 + 评分)===========\n")
-for (i in seq_len(nrow(C))) with(C[i, ], cat(sprintf("  %-20s PhenoAge %.4f | 合并 %.4f | ΔC %+.4f (%+.4f, %+.4f)   [KSAA 单独 %.4f,备查]\n",
+cat("\n=========== A. Discrimination (Harrell C, age + sex + score) ===========\n")
+for (i in seq_len(nrow(C))) with(C[i, ], cat(sprintf("  %-20s PhenoAge %.4f | combined %.4f | ΔC %+.4f (%+.4f, %+.4f)   [KSAA alone %.4f, for reference]\n",
   outcome, C_pa, C_cb, dC_vs_pa, dC_vs_pa_lo, dC_vs_pa_hi, C_ks)))
-for (i in seq_len(nrow(C))) with(C[i, ], cat(sprintf("  %-20s 相对 C %+.2f%% (%+.2f%%, %+.2f%%) | R²_D PhenoAge %.4f -> 合并 %.4f  相对 %+.1f%% (%+.1f%%, %+.1f%%)   [KSAA 单独 %.4f]\n",
+for (i in seq_len(nrow(C))) with(C[i, ], cat(sprintf("  %-20s relative C %+.2f%% (%+.2f%%, %+.2f%%) | R²_D PhenoAge %.4f -> combined %.4f  relative %+.1f%% (%+.1f%%, %+.1f%%)   [KSAA alone %.4f]\n",
   outcome, relC, relC_lo, relC_hi, R2_pa, R2_cb, relR2, relR2_lo, relR2_hi, R2_ks)))
-cat("\n=========== B/C. 每 SD 的 HR 与最高 5% 的 HR ===========\n")
-for (i in seq_len(nrow(S))) with(S[i, ], cat(sprintf("  %-20s %-22s 每 SD %.2f (%.2f–%.2f) | ≥95 百分位 %.2f (%.2f–%.2f)\n",
+cat("\n=========== B/C. HR per SD and HR for the top 5% ===========\n")
+for (i in seq_len(nrow(S))) with(S[i, ], cat(sprintf("  %-20s %-22s per SD %.2f (%.2f–%.2f) | >=95th percentile %.2f (%.2f–%.2f)\n",
   outcome, score, hr_sd, lo_sd, hi_sd, hr_p95, lo_p95, hi_p95)))
-cat("\n=========== 改善(合并 vs PhenoAge),bootstrap CI ===========\n")
+cat("\n=========== Improvement (combined vs PhenoAge), bootstrap CI ===========\n")
 for (i in seq_len(nrow(IMP))) with(IMP[i, ], cat(sprintf("  %-20s %-7s %+.1f%% (%+.1f%%, %+.1f%%)%s\n",
-  outcome, metric, pct, pct_lo, pct_hi, if (pct_lo <= 0 && pct_hi >= 0) "   <- CI 跨 0,改善不显著" else "")))
-cat(sprintf("\n  合并权重与分位切点在每次重抽内重估(B = %d);合并评分为表观值,未做乐观校正\n", B))
+  outcome, metric, pct, pct_lo, pct_hi, if (pct_lo <= 0 && pct_hi >= 0) "   <- CI includes 0, improvement not significant" else "")))
+cat(sprintf("\n  Combination weights and quantile cut points re-estimated within each resample (B = %d); the combined score is apparent, without optimism correction\n", B))
 cat("\n-> phenoage_combined_scores.csv, phenoage_combined_cindex.csv, phenoage_combined_improvement.csv\n")
 })

@@ -1,13 +1,13 @@
-"""用启发式自举 YOLO 膝关节检测数据集。
+"""Bootstrap a YOLO knee detection data set with heuristics.
 
-输入 = 整张双膝片(降采样到 1024),输出 = 2 个框(class 0 = 受试者右膝 / 1 = 左膝)。
-框由 v4 的关节定位逻辑给出:关节行定位实测 24/24 正确,可直接用作候选;
-ROI 边界是启发式的弱项,正是要靠人工审核 + 模型学习来修的部分。
+Input = whole bilateral knee film (downsampled to 1024); output = 2 boxes (class 0 = participant's right knee / 1 = left knee).
+Boxes come from the v4 joint localization logic: joint-row localization was correct in 24/24 checked films, so it serves as a candidate;
+ROI extent is the weak point of the heuristic and is what manual review plus model training are meant to fix.
 
-同时输出 suspicion 分,用于把最可能标错的片子排到审核队列前面:
-  - 去趋势凹陷强度低 -> 关节定位不可信
-  - 左右膝关节行差异大 -> 至少一侧定位错了(站立位双膝关节高度应接近)
-  - 腓骨侧别判定与"左半=右膝"的默认假设冲突 -> 可能整片镜像
+A suspicion score is also written to put the films most likely mislabelled at the front of the review queue:
+  - weak detrended dip -> joint localization unreliable
+  - large difference between left and right joint rows -> at least one side is wrong (joint heights should be similar on standing films)
+  - fibula-based laterality conflicts with the default "left half = right knee" -> the film may be mirrored
 """
 import os, sys, glob, random, csv, numpy as np
 from multiprocessing import Pool
@@ -18,7 +18,7 @@ DIR = "/home/data/knee_xray"
 OUT = "/home/data/knee_yolo"
 SAT = 63000
 LONG = 1024
-# 框宽(相对整片宽度)的稳健区间,由 300 张实测分布定(中位 0.185);标准化协议片膝宽近乎常数,钳制不损失信号
+# robust range of box width (fraction of film width), from the distribution in 300 films (median 0.185); knee width is nearly constant under the standardized protocol, so clamping loses no signal
 W_LO, W_HI, W_MED = 0.15, 0.23, 0.185
 
 def _box(x, k):
@@ -26,7 +26,7 @@ def _box(x, k):
     return np.convolve(np.pad(x, pad, mode="edge"), np.ones(k)/k, mode="valid")
 
 def _longest_run(on, fallback):
-    # best 须从零跨度起步,否则更新条件恒为假
+    # best must start from a zero span, otherwise the update condition is never true
     best, cur, s = (0, 0), 0, 0
     for i, v in enumerate(on):
         if v:
@@ -37,7 +37,7 @@ def _longest_run(on, fallback):
     return best if best[1] > best[0] else (0, fallback)
 
 def limb_cols(h):
-    # 均值定位 + 标准差门控:胶片边缘亮带列均值高但 std 近零,先按 std 排掉,再用均值找最长连续段
+    # mean localization + SD gating: bright film-edge bands have high column means but near-zero SD, so drop them by SD first, then find the longest run by mean
     m = np.where(h >= SAT, 0, h).astype(np.float32)
     band = m[int(.25*m.shape[0]):int(.75*m.shape[0]), :]
     pm, ps = band.mean(axis=0), band.std(axis=0)
@@ -90,16 +90,16 @@ def one(p):
             c0, c1 = knee_cols(h, jr, c1-c0)
             fib = fibula_side(h, c0, c1, jr)
             w = c1-c0; cc = (c0+c1)//2 + off
-            boxes.append([cls, cc, jr, w*1.16])       # 尺寸稍后统一钳制
+            boxes.append([cls, cc, jr, w*1.16])       # size clamped later
             rows.append(dict(side=side, jr=jr, w=w, strength=strength, fib=fib))
 
-        # 中心可靠、尺寸不可靠:左右膝取同一宽度并钳到稳健区间
+        # centre reliable, size not: use the same width for both knees, clamped to the robust range
         bw = float(np.clip(np.mean([b[3] for b in boxes])/W, W_LO, W_HI)) * W
         for b in boxes: b[3] = bw
 
         dj = abs(rows[0]["jr"] - rows[1]["jr"])
         lat_ok = (rows[0]["fib"] == "R" and rows[1]["fib"] == "L")
-        # 侧别不进评分:左半 = 受试者右膝(审核图已证实);腓骨判据无信息量
+        # laterality not scored: left half = participant's right knee (confirmed in review images); the fibula criterion is uninformative
         susp = (0.0 if rows[0]["strength"] > .35 else 1.0) + \
                (0.0 if rows[1]["strength"] > .35 else 1.0) + \
                (1.5 if dj > 250 else 0.0)
@@ -132,10 +132,10 @@ if __name__ == "__main__":
         wtr = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore"); wtr.writeheader()
         for r in res: wtr.writerow(r)
     ok = [r for r in res if r["ok"]]
-    print(f"成功 {len(ok)} / {len(res)}")
+    print(f"succeeded {len(ok)} / {len(res)}")
     if ok:
         import statistics as st
-        print(f"  可疑分>0 的片子: {sum(1 for r in ok if r['susp']>0)}")
-        print(f"  侧别判定与默认冲突: {sum(1 for r in ok if not r['lat_ok'])}")
-        print(f"  左右关节行差 中位 {st.median(r['dj'] for r in ok):.0f}  "
-              f"90分位 {sorted(r['dj'] for r in ok)[int(.9*len(ok))]:.0f}")
+        print(f"  films with suspicion > 0: {sum(1 for r in ok if r['susp']>0)}")
+        print(f"  laterality conflicting with default: {sum(1 for r in ok if not r['lat_ok'])}")
+        print(f"  left-right joint-row difference median {st.median(r['dj'] for r in ok):.0f}  "
+              f"90th percentile {sorted(r['dj'] for r in ok)[int(.9*len(ok))]:.0f}")

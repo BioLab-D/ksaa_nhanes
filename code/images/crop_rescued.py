@@ -1,8 +1,8 @@
-"""裁救援回来的旋转片。
+"""Crop the rescued rotated films.
 
-boxes_rot.csv 的归一化坐标是相对**旋转后**的图像,所以必须先把原始 TIFF
-按同一角度旋转,再套坐标。rot 字段直接就是 PIL rotate() 的参数,
-沿用同一调用避免方向搞错。
+The normalized coordinates in boxes_rot.csv are relative to the **rotated** image, so the original TIFF must first
+be rotated by the same angle before applying them. The rot field is the argument of PIL rotate(),
+and the same call is reused to avoid getting the direction wrong.
 """
 import os, csv, numpy as np
 from multiprocessing import Pool
@@ -39,11 +39,11 @@ def one(stem):
 
 if __name__ == "__main__":
     stems = sorted(boxes)
-    print(f"待裁 {len(stems)} 张旋转片", flush=True)
+    print(f"{len(stems)} rotated films to crop", flush=True)
     with Pool(10) as p: res = p.map(one, stems, chunksize=4)
     ok = sum(x for x in res if isinstance(x,int))
     err = [x for x in res if not isinstance(x,int)]
-    print(f"新增 ROI {ok} 个;失败 {len(err)}")
+    print(f"new ROIs {ok}; failed {len(err)}")
     for e in err[:5]: print(" ", e)
     import glob
-    print(f"ROI 总数: {len(glob.glob(OUT+'/*.png'))}")
+    print(f"total ROIs: {len(glob.glob(OUT+'/*.png'))}")

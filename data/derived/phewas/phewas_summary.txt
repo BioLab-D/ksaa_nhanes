@@ -1,17 +1,17 @@
-PheWAS(审核表 v1.2;KSAA → 表型;加权;协变量 年龄/性别/种族/教育/PIR)
+PheWAS (audit table v1.2; KSAA -> phenotype; weighted; covariates age/sex/race/education/PIR)
 
-[main] 表型 482(拟合失败 0);模型:binomial 265 gaussian 152 ordinal 65;FDR<5% 109;Bonferroni 50;Li–Ji meff 332 → 53;两相位复制 66
-[supplementary] 表型 59(拟合失败 0);模型:binomial 58 gaussian 1;FDR<5% 1;Bonferroni 1;Li–Ji meff 38 → 1;两相位复制 1
-[exposure_module] 表型 174(拟合失败 0);模型:binomial 52 gaussian 109 nominal 3 ordinal 10;FDR<5% 10;Bonferroni 6;Li–Ji meff 141 → 6;两相位复制 8
+[main] phenotypes 482 (failed fits 0); models: binomial 265 gaussian 152 ordinal 65; FDR<5% 109; Bonferroni 50; Li-Ji meff 332 -> 53; replicated in both phases 66
+[supplementary] phenotypes 59 (failed fits 0); models: binomial 58 gaussian 1; FDR<5% 1; Bonferroni 1; Li-Ji meff 38 -> 1; replicated in both phases 1
+[exposure_module] phenotypes 174 (failed fits 0); models: binomial 52 gaussian 109 nominal 3 ordinal 10; FDR<5% 10; Bonferroni 6; Li-Ji meff 141 -> 6; replicated in both phases 8
 
-主分析独立信号(FDR<5% 者按 |r|>0.7 归并):80 个;领头:BDPTRBMD PEP1 HAY11D PFP_steps_8ft_mean HAH9 HAG34 PFPRFLEX PEP13A HAH3 PEP13E1A PEP13E5A HAG22 APPSI HAH15 HAC1A HAY11C HAH1 FPP1090 HAH2 PFPDEVIC PEP13E2A HAH6 HAH5 HAH8 HAG5A PEP10B4 HAH14 BMPSUB HAH4 FPPSURET PEP1A2 HAB4 SPPPEAK BMPTRI BMPTHICI PFPUSTND PFPRSER HAF14 HAH10 BDPTOARE RWP HAS24 HAH13 HAB1 HAG25 LMP HAZMNK5R MAPF25 LMPPCNT AAP HAJ9 PFPTSTND HAG27 FPP1100 UBP PFPLSIR HAD1 PFPTTAND PHPINSU HAC5A1 BMPSITHT HAB5 MAPD_story_recall_delayed_total ATPSI HAP18_serial_subtraction HAG11 TIP PEP12A1 PVPSI HAP17B HAG14 HAE2 AMP CHP HAG20 PEP13E4A MIP PFPPAIN HAH12 HAP19_word_recall
+Main-analysis independent signals (FDR<5% merged at |r|>0.7): 80; leads: BDPTRBMD PEP1 HAY11D PFP_steps_8ft_mean HAH9 HAG34 PFPRFLEX PEP13A HAH3 PEP13E1A PEP13E5A HAG22 APPSI HAH15 HAC1A HAY11C HAH1 FPP1090 HAH2 PFPDEVIC PEP13E2A HAH6 HAH5 HAH8 HAG5A PEP10B4 HAH14 BMPSUB HAH4 FPPSURET PEP1A2 HAB4 SPPPEAK BMPTRI BMPTHICI PFPUSTND PFPRSER HAF14 HAH10 BDPTOARE RWP HAS24 HAH13 HAB1 HAG25 LMP HAZMNK5R MAPF25 LMPPCNT AAP HAJ9 PFPTSTND HAG27 FPP1100 UBP PFPLSIR HAD1 PFPTTAND PHPINSU HAC5A1 BMPSITHT HAB5 MAPD_story_recall_delayed_total ATPSI HAP18_serial_subtraction HAG11 TIP PEP12A1 PVPSI HAP17B HAG14 HAE2 AMP CHP HAG20 PEP13E4A MIP PFPPAIN HAH12 HAP19_word_recall
 
-主分析 FDR<5% 按健康类别:
+Main analysis FDR<5% by health class:
 
    disease   function healthcare  objective self_rated    symptom 
          9         31          2         57          2          8 
 
-主分析前 30:
+Main analysis top 30:
   BDPTRBMD  BMD of trochanter region - gm/cm sq            gaussian  n=3979   -0.22 (-0.25--0.19)  P=2.5e-18 FDR=1.2e-15  ph1 -0.22/2.3e-09 ph2 -0.22/5.7e-10 REP
   BDPTOBMD  Bone minrl density total region-gm/cm sq       gaussian  n=3979   -0.22 (-0.26--0.19)  P=2.0e-17 FDR=4.7e-15  ph1 -0.21/8.1e-10 ph2 -0.23/3.5e-10 REP
   BDPINBMD  BMD of intertrochanter region - gm/cm sq       gaussian  n=3979   -0.23 (-0.26--0.19)  P=5.7e-17 FDR=9.1e-15  ph1 -0.21/8.7e-10 ph2 -0.24/1.5e-10 REP
@@ -43,11 +43,11 @@ PheWAS(审核表 v1.2;KSAA → 表型;加权;协变量 年龄/性别/种族/教�
   HAH1      Difficulty walking a quarter of a mile         binomial  n=4181    1.36 (1.22-1.52)  P=9.4e-07 FDR=1.6e-05  ph1 1.43/1.7e-06 ph2 1.31/9.2e-04 REP
   FPP1090   Hard exudates                                  ordinal   n=3510    1.95 (1.53-2.48)  P=1.2e-06 FDR=2.0e-05  ph1 2.20/1.7e-05 ph2 1.79/6.4e-03 REP
 
-拟合失败:
+Failed fits:
 [1] variable  phenotype model     n         error    
 <0 rows> (or 0-length row.names)
 
-回退/重编码说明:
+Fallback/recoding notes:
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       merged [1]+[2]; 2 levels after merge;  
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            1 

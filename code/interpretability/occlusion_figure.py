@@ -1,7 +1,7 @@
-# 遮挡敏感度示例图:版式与 saliency_figure.py 的示例图相同(同 6 个膝、标题、框色、配色),叠加 occlusion_map.py 的 |Δ 预测年龄|,
-#   显示前做轻度高斯平滑(σ = 2 个网格单元 = 448 像素尺度 8 像素,约半个遮挡方块),6 个面板共用一个色标(平滑后各图合并的第 99.5 百分位),并加色标条。
-# 输入:results/analysis/saliency/occlusion_map_examples.npz、ksaa_for_saliency.csv;ROI 影像(KNEE_ROI)。
-# 输出:results/figures/FigureS2.{png,pdf}(补充图 S2)。跑法(仓库根目录下):python code/interpretability/occlusion_figure.py
+# Occlusion sensitivity example figure: same layout as the saliency_figure.py examples (same 6 knees, titles, frame colors, colormap), overlaying |Δ predicted age| from occlusion_map.py,
+#   lightly Gaussian-smoothed for display (sigma = 2 grid cells = 8 px at 448, about half a patch); the 6 panels share one color scale (99.5th percentile of the pooled smoothed maps) with a color bar.
+# Input: results/analysis/saliency/occlusion_map_examples.npz, ksaa_for_saliency.csv; ROI images (KNEE_ROI).
+# Output: results/figures/FigureS2.{png,pdf} (Supplementary Fig. S2). Run (from the repository root): python code/interpretability/occlusion_figure.py
 import os, sys, csv, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from saliency_common import KB, OUT, roi_file, pre
@@ -16,10 +16,10 @@ CM = LinearSegmentedColormap.from_list("sal", ["#000000", "#5b1a8a", "#d1335b", 
 mi = lambda s: s.replace("-", "−")
 
 Z = np.load(os.path.join(OUT, "occlusion_map_examples.npz")); SEQ = list(Z["seqn"]); assert str(Z["side"]) == "R"
-M = TF.gaussian_blur(torch.from_numpy(Z["abs"]).float()[:, None], kernel_size=13, sigma=2.0)[:, 0].numpy()   # 轻度平滑:步长 16 像素的方块感
+M = TF.gaussian_blur(torch.from_numpy(Z["abs"]).float()[:, None], kernel_size=13, sigma=2.0)[:, 0].numpy()   # light smoothing of the 16-pixel stride blockiness
 info = {r["SEQN"]: r for r in csv.DictReader(open(os.path.join(OUT, "ksaa_for_saliency.csv")))}
-pairs = [(0, 1), (2, 3), (4, 5)]                                     # (年轻外观, 衰老外观),顺序同 occlusion_map.py --seqn
-VMAX = float(np.percentile(M, 99.5))                                 # 共用色标
+pairs = [(0, 1), (2, 3), (4, 5)]                                     # (younger-appearing, older-appearing), in the order of occlusion_map.py --seqn
+VMAX = float(np.percentile(M, 99.5))                                 # shared color scale
 
 WF, SF, GX, GY, XL, YT = 160.0, 47.0, 3.0, 9.0, 9.0, 8.0; CBW = 20.0; HF = YT + 2 * SF + GY + 2.0
 fig = plt.figure(figsize=((WF + CBW) / 25.4, HF / 25.4)); WT = WF + CBW

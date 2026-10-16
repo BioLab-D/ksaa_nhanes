@@ -1,12 +1,12 @@
-# PheWAS:按审核表(phewas_audit.R)的加权全表型扫描,方向 KSAA → 表型。
-# 模型:每个表型一个,暴露 = KSAA 每 SD(全队列 SD),协变量固定为年龄、性别、种族/族裔、教育(edu3)、PIR(不按单变量显著性增减)。
-#   连续 → svyglm 高斯(偏态先取对数再标准化);二分类 → quasibinomial(OR);有序 ≥3 级 → svyolr(稀疏级 <30 并入相邻级);名义 → 反向联合检验,只报 P。
-#   设计:WTPFEX6 + SDPPSU6/SDPSTRA6(nest);空腹亚样本变量用 WTPFSD6;生殖史题限女性、不调整性别;子集一律 subset(design)。
-# 复制:phase 1 / phase 2 各用相位设计(WTPFEXn + SDPPSUn/SDPSTRAn)拟合,"复制" = 两相位同向且各 P < 0.05。
-#   P 与 CI 用 t 分布、自由度 = 设计自由度(6 年设计 49,相位设计 23);不用 6 年设计切相位(层内只剩 1 个 PSU)。
-# 多重校正:主分析集、补充集、扩展模块各自做 BH-FDR、Bonferroni、Li–Ji 有效检验数。
-# 输入 results/analysis/{analysis_data.rds, fxf_vars.csv, ewas/ewas_clean.rds, ewas/ewas_audit_table.csv, ewas/ewas_multilevel_plan.csv}
-# 输出 results/analysis/phewas/phewas_results.csv、phewas_y.rds、phewas_summary.txt
+# PheWAS: survey-weighted phenome-wide scan following the audit table (phewas_audit.R), direction KSAA -> phenotype.
+# Models: one per phenotype; exposure = KSAA per SD (full-cohort SD); covariates fixed as age, sex, race/ethnicity, education (edu3) and PIR (not selected by univariable significance).
+#   continuous -> svyglm Gaussian (log-transformed then standardized if skewed); binary -> quasibinomial (OR); ordinal >= 3 levels -> svyolr (sparse levels < 30 merged into neighbours); nominal -> reverse joint test, P only.
+#   Design: WTPFEX6 + SDPPSU6/SDPSTRA6 (nest); fasting-subsample variables use WTPFSD6; reproductive-history items restricted to women, not adjusted for sex; subsets always via subset(design).
+# Replication: phase 1 / phase 2 each fitted with the phase design (WTPFEXn + SDPPSUn/SDPSTRAn); "replicated" = same direction in both phases, each P < 0.05.
+#   P and CI from the t distribution with design df (49 for the 6-year design, 23 for phase designs); the 6-year design is not split by phase (1 PSU left per stratum).
+# Multiple testing: BH-FDR, Bonferroni and the Li-Ji effective number of tests within the main, supplementary and extended-module sets separately.
+# Input results/analysis/{analysis_data.rds, fxf_vars.csv, ewas/ewas_clean.rds, ewas/ewas_audit_table.csv, ewas/ewas_multilevel_plan.csv}
+# Output results/analysis/phewas/phewas_results.csv, phewas_y.rds, phewas_summary.txt
 suppressMessages({library(survey); library(MASS); library(DBI); library(duckdb)})
 options(survey.lonely.psu = "adjust")
 res <- here::here("results"); out <- file.path(res, "analysis"); ew <- file.path(out, "phewas")
@@ -24,7 +24,7 @@ SDG <- sd(d$gap); d$z <- d$gap / SDG
 d$sex <- factor(d$sex); d$race <- factor(d$race); d$edu3 <- factor(d$edu3)
 COV <- c("age", "sex", "race", "edu3", "pir")
 mkdes <- function(w, psu, str, rows) svydesign(id = as.formula(paste0("~", psu)), strata = as.formula(paste0("~", str)), weights = as.formula(paste0("~", w)), nest = TRUE, data = d[rows, ])
-# 设计:6 年设计、相位设计、空腹亚样本权重;rows 用于对齐 y
+# designs: 6-year design, phase designs, fasting-subsample weights; rows align y
 DS <- list(all = list(des = mkdes("WTPFEX6", "SDPPSU6", "SDPSTRA6", TRUE), rows = rep(TRUE, nrow(d))),
            p1 = list(des = mkdes("WTPFEX1", "SDPPSU1", "SDPSTRA1", d$phase == 1), rows = d$phase == 1),
            p2 = list(des = mkdes("WTPFEX2", "SDPPSU2", "SDPSTRA2", d$phase == 2), rows = d$phase == 2),
@@ -33,7 +33,7 @@ DS <- list(all = list(des = mkdes("WTPFEX6", "SDPPSU6", "SDPSTRA6", TRUE), rows 
            fp2 = list(des = mkdes("WTPFSD2", "SDPPSU2", "SDPSTRA2", d$WTPFSD2 > 0), rows = d$WTPFSD2 > 0))
 skew <- function(x) mean((x - mean(x))^3) / sd(x)^3
 
-# ---------- 合成得分:故事回忆即时 / 延迟各 6 段 → 0–6;地址定向 4 题 → 0–4 ----------
+# ---------- Composite scores: story recall immediate / delayed, 6 segments each -> 0-6; address orientation, 4 items -> 0-4 ----------
 lab_of <- function(v) CL$labs[[v]]
 score <- function(vs, re) { M <- sapply(vs, function(v) { x <- CL$x[[v]]; lb <- lab_of(v); yes <- as.numeric(names(lb)[grepl(re, lb, ignore.case = TRUE)])
   ifelse(is.na(x), NA, as.numeric(x %in% yes)) }); ifelse(rowSums(is.na(M)) > 0, NA, rowSums(M)) }
@@ -45,8 +45,8 @@ for (nm in names(COMP)) { it <- COMP[[nm]]; stopifnot(all(it$items %in% A$variab
   r <- A[A$variable == it$items[1], ]; r$variable <- nm; r$label <- it$label; r$type <- "continuous"; r$summarise_to <- ""; r$reason <- paste("composite of", length(it$items), "items")
   A <- rbind(A[!(A$variable %in% it$items), ], r) }
 
-# ---------- 其余重复测量 / 多题测验的汇总,定义与表 S10 一致 ----------
-# 新构造表型同样过门槛:连续 ≥500 且 ≥5 个不同值;二分类 ≥500 且每类 ≥100;有序 ≥500。
+# ---------- Summaries of other repeated measures / multi-item tests, defined as in Table S10 ----------
+# new phenotypes pass the same thresholds: continuous >= 500 and >= 5 distinct values; binary >= 500 and >= 100 per class; ordinal >= 500.
 gate <- function(y, type) { y <- y[!is.na(y)]; if (type == "continuous") length(y) >= 500 && length(unique(y)) >= 5
   else if (length(unique(y)) == 2) length(y) >= 500 && min(table(y)) >= 100 else length(y) >= 500 }
 add_pheno <- function(nm, y, type, label, tmpl, cls, src, note, labs = character()) {
@@ -59,7 +59,7 @@ add_pheno <- function(nm, y, type, label, tmpl, cls, src, note, labs = character
   A <<- rbind(A[!(A$variable %in% src), ], r) }
 xv <- function(v) CL$x[[v]]
 lev_is <- function(v, re) { ll <- CL$labs[[v]][as.character(CL$x[[v]])]; ifelse(is.na(CL$x[[v]]), NA, as.numeric(grepl(re, ll, ignore.case = TRUE))) }
-# 重复测量:步速取两次较快(= 表 S10 gait,逐位核对)、步数取均值、脉搏取家访与体检均值
+# repeated measures: gait speed from the faster of two trials (= Table S10 gait, checked value by value), mean steps, mean of home and examination pulse
 sp <- 2.4384 / suppressWarnings(pmin(xv("PFPTWLKA"), xv("PFPTWLKB"), na.rm = TRUE)); sp[!is.finite(sp)] <- NA
 stopifnot(identical(is.na(sp), is.na(d$gait)), max(abs(sp - d$gait), na.rm = TRUE) < 1e-9)
 add_pheno("PFP_gait_speed", sp, "continuous", "Gait speed (faster of two 8-ft walks, m/s)", "PFPTWLKA", "function", c("PFPTWLKA", "PFPTWLKB"),
@@ -69,13 +69,13 @@ add_pheno("PFP_steps_8ft_mean", mn2(xv("PFPNSTPA"), xv("PFPNSTPB")), "continuous
           c("PFPNSTPA", "PFPNSTPB"), "v1.2: repeated trials summarised (mean)")
 add_pheno("pulse_mean", mn2(xv("HAZA5R"), xv("PEP6DR")), "continuous", "Pulse rate (mean of household and examination readings)", "HAZA5R", "objective",
           c("HAZA5R", "PEP6DR"), "v1.2: repeated measurement summarised (mean of household and MEC readings, as for blood pressure)")
-# 连减 5 题 → 答对题数(正确答案 17/14/11/8/5):55 "can't do"、99 "don't know" 记答错,88 与空白为缺失,任一题缺失则得分缺失。
-#   清洗表把 55/99 置为缺失,故从 duckdb 取原始码。
+# serial subtraction, 5 items -> number correct (answers 17/14/11/8/5): 55 "can't do" and 99 "don't know" scored wrong, 88 and blank missing; score missing if any item is missing.
+#   the cleaned table sets 55/99 to missing, so raw codes are read from duckdb.
 con <- dbConnect(duckdb(), here::here("data", "nhanes3", "nhanes3_knee_cohort.duckdb"), read_only = TRUE); dbWriteTable(con, "coh", data.frame(SEQN = d$SEQN), temporary = TRUE)
 H18 <- dbGetQuery(con, "select SEQN, HAP18A, HAP18B, HAP18C, HAP18D, HAP18E from nhanes3_adult join coh using (SEQN)"); dbDisconnect(con, shutdown = TRUE)
 H18 <- H18[match(d$SEQN, H18$SEQN), ]; KEY <- c(HAP18A = 17, HAP18B = 14, HAP18C = 11, HAP18D = 8, HAP18E = 5)
 M18 <- sapply(names(KEY), function(v) { r <- H18[[v]]; ifelse(is.na(r) | r == 88, NA, as.numeric(r == KEY[[v]])) })
-for (v in names(KEY)) stopifnot(all(xv(v)[!is.na(xv(v))] == H18[[v]][!is.na(xv(v))]))   # 清洗表的有效值与原始码一致
+for (v in names(KEY)) stopifnot(all(xv(v)[!is.na(xv(v))] == H18[[v]][!is.na(xv(v))]))   # valid values in the cleaned table match the raw codes
 add_pheno("HAP18_serial_subtraction", ifelse(rowSums(is.na(M18)) > 0, NA, rowSums(M18)), "continuous", "Serial subtraction of $3, answers correct (0-5)", "HAP18A", "objective",
           names(KEY), "v1.2: 5 items scored correct / incorrect ('can't do' and 'don't know' = incorrect); replaces the answers analysed as continuous values")
 sc3 <- function(vs) { M <- sapply(vs, lev_is, re = "^correct"); ifelse(rowSums(is.na(M)) > 0, NA, rowSums(M)) }
@@ -84,9 +84,9 @@ add_pheno("HAP17_word_registration", sc3(c("HAP17A1", "HAP17A2", "HAP17A3")), "c
           c("HAP17A1", "HAP17A2", "HAP17A3"), "v1.2: 3 items summed (as for story recall); ordinal (fewer than 5 values)", L03)
 add_pheno("HAP19_word_recall", sc3(c("HAP19A", "HAP19B", "HAP19C")), "categorical", "Three-word recall (words correct, 0-3)", "HAP19A", "objective",
           c("HAP19A", "HAP19B", "HAP19C"), "v1.2: 3 items summed (as for story recall); ordinal (fewer than 5 values)", L03)
-# 与表 S10 定义统一,原变量就地重编码(每个变量在扫描中只出现一次):
-#   困难程度题(HAH1–HAH12、PEP13E1A–E5A)→ 任一困难(含做不到)vs 无;跌倒 HAG14 → 过去 12 个月 ≥1 次;
-#   串联站立 PFPTTAND → 不能坚持 10 秒(含未能尝试者);骨折题不变。新编码与表 S10 派生变量逐位核对。
+# recoded in place to match the Table S10 definitions (each variable appears once in the scan):
+#   difficulty items (HAH1-HAH12, PEP13E1A-E5A) -> any difficulty (including unable) vs none; falls HAG14 -> >= 1 in the past 12 months;
+#   tandem stand PFPTTAND -> unable to hold 10 s (including those not attempting); fracture items unchanged. New codes checked value by value against the Table S10 derived variables.
 FXV <- read.csv(file.path(out, "fxf_vars.csv")); FXV <- FXV[match(d$SEQN, FXV$SEQN), ]
 cmp <- function(a, b) { k <- !is.na(a) & !is.na(b); stopifnot(all(a[k] == b[k])); invisible(TRUE) }
 recode_bin <- function(v, y, lab0, lab1, note) { stopifnot(v %in% A$variable, length(y) == nrow(d))
@@ -102,18 +102,18 @@ cmp(d$fall, as.numeric(xv("HAG14") >= 1)); stopifnot(identical(is.na(d$fall), is
 recode_bin("HAG14", d$fall, "No", "Yes", "v1.2: at least one fall in the past 12 months, as in Table S8")
 cmp(FXV$tand_fail, as.numeric(xv("PFPTTAND") < 10))
 recode_bin("PFPTTAND", FXV$tand_fail, "No", "Yes", "v1.2: unable to hold the tandem stand for 10 s, as in Table S8")
-cat(sprintf("审核表 v1.2:主分析表型 %d(补充 %d;扩展模块 %d)\n", sum(A$status == "main"), sum(A$status == "supplementary"), sum(A$status == "exposure_module")))
+cat(sprintf("Audit table v1.2: main-analysis phenotypes %d (supplementary %d; extended module %d)\n", sum(A$status == "main"), sum(A$status == "supplementary"), sum(A$status == "exposure_module")))
 
-# ---------- 逐变量类型判定与重编码(规则事先写定,理由随结果输出)----------
-NA3 <- c(HAF2 = "Never walks uphill or hurries", HAL14D = "Doesn't work", HAL17 = "Never received allergy shots")   # 第三级 = 不适用 → 缺失,二分类
+# ---------- Per-variable type and recoding (rules pre-specified; reasons written with the results) ----------
+NA3 <- c(HAF2 = "Never walks uphill or hurries", HAL14D = "Doesn't work", HAL17 = "Never received allergy shots")   # third level = not applicable -> missing; binary
 ORDMAP <- list(HAK4 = c(`3` = 0, `1` = 1, `2` = 2),          # never < 1-2 < 3+ times
                PFPSCOOT = c(`2` = 0, `1` = 1, `3` = 2))      # no < yes(uses arms) < unable
-ORD_AS_IS <- c("PFPUSTND", "PFPLSER", "PFPRSER", "ANP", "HZP", "MIP", "DEPDQL1", "DEPDQU1")   # 计划表误标 NOM/LAT/YNA,实为有序
+ORD_AS_IS <- c("PFPUSTND", "PFPLSER", "PFPRSER", "ANP", "HZP", "MIP", "DEPDQL1", "DEPDQU1")   # mislabelled NOM/LAT/YNA in the plan; actually ordinal
 BIN_RULE <- list(DEPLPTYP = list(one = "partial", zero = "full", drop = "unable", note = "partial vs full denture; 'unable to evaluate' -> missing"),
                  DEPUPTYP = list(one = "partial", zero = "full", drop = "unable", note = "partial vs full denture; 'unable to evaluate' -> missing"),
                  GUPFDX1R = list(one = "gallstone|cholecystectomy", zero = "^normal", drop = "no conclusion|abnormal", note = "gallbladder disease (stones or cholecystectomy) vs normal; inconclusive/other -> missing"),
                  HAP2 = list(one = "eyeglasses|contact|both", zero = "neither", drop = "^$", note = "any vision correction vs none"))
-merge_sparse <- function(y, min_n = 30) {   # 有序:<30 的级并入相邻级(端点并向内,中间并向人数少的一侧)
+merge_sparse <- function(y, min_n = 30) {   # ordinal: levels < 30 merged into a neighbour (end levels inward, middle levels toward the smaller neighbour)
   notes <- character(); repeat { tb <- table(y); if (length(tb) <= 2 || min(tb) >= min_n) break
     i <- which.min(tb); L <- names(tb); j <- if (i == 1) 2 else if (i == length(tb)) i - 1 else if (tb[i - 1] <= tb[i + 1]) i - 1 else i + 1
     a <- L[min(i, j)]; b <- L[max(i, j)]; new <- paste(a, b, sep = "+"); notes <- c(notes, sprintf("merged [%s]+[%s]", a, b))
@@ -130,7 +130,7 @@ prep <- function(v, r) {
   else if (v %in% names(ORDMAP)) { m <- ORDMAP[[v]]; y <- unname(m[as.character(x)]); notes <- "levels re-ordered to a monotone scale"; k <- length(m) }
   else if (cls == "LAT" && any(grepl("right|left", ll, ignore.case = TRUE))) { y <- ifelse(is.na(ll), NA, ifelse(grepl("^no\\b", ll, ignore.case = TRUE), 0, ifelse(grepl("both", ll, ignore.case = TRUE), 2, 1))); notes <- "none < unilateral < bilateral"; k <- 3 }
   else if (cls == "NOM" && !(v %in% ORD_AS_IS) && k > 2) { y <- factor(ll); return(list(y = y, model = "nominal", notes = "nominal: reverse joint test only", levels = paste(sprintf("%s=%d", names(table(y)), as.integer(table(y))), collapse = " | "))) }
-  if (k == 2) { u <- sort(unique(y[!is.na(y)])); if (!identical(as.numeric(u), c(0, 1))) {   # 参照级:No/None/Never/Normal 优先,否则最小编码
+  if (k == 2) { u <- sort(unique(y[!is.na(y)])); if (!identical(as.numeric(u), c(0, 1))) {   # reference level: No/None/Never/Normal first, otherwise the smallest code
       l2 <- lb[as.character(u)]; neg <- which(grepl("^(no|none|never|normal|not)\\b|no difficulty|no findings|no pain|^correct|^yes, recalled", l2, ignore.case = TRUE))
       ref <- if (length(neg)) u[neg[1]] else u[1]; y <- as.numeric(y != ref); notes <- c(notes, sprintf("1 = %s", lb[as.character(setdiff(u, ref))])) }
     tb <- table(y); return(list(y = y, model = "binomial", notes = notes, levels = sprintf("0=%d | 1=%d", tb[["0"]], tb[["1"]]))) }
@@ -141,10 +141,10 @@ prep <- function(v, r) {
 }
 
 fit <- function(model, des, cov) {
-  v <- des$variables; cov <- cov[sapply(cov, function(cv) length(unique(v[[cv]])) > 1)]      # 子集内单一水平的协变量(单性别题的 sex)剔除
+  v <- des$variables; cov <- cov[sapply(cov, function(cv) length(unique(v[[cv]])) > 1)]      # drop covariates with one level in the subset (sex for single-sex items)
   df <- degf(des); tp <- function(b, se) 2 * pt(-abs(b / se), df)
   f <- as.formula(paste("y ~ z +", paste(cov, collapse = " + ")))
-  err <- ""; note <- ""; used <- model    # used = 实际拟合的模型(有序拟合失败会回退成二分类)
+  err <- ""; note <- ""; used <- model    # used = model actually fitted (a failed ordinal fit falls back to binary)
   o <- tryCatch({
     if (model == "gaussian") { m <- svyglm(f, des); s <- summary(m)$coefficients; c(s["z", 1], s["z", 2], tp(s["z", 1], s["z", 2])) }
     else if (model == "binomial") { m <- svyglm(f, des, family = quasibinomial()); s <- summary(m)$coefficients; c(s["z", 1], s["z", 2], tp(s["z", 1], s["z", 2])) }
@@ -161,18 +161,18 @@ fit <- function(model, des, cov) {
 
 R <- list(); YN <- list()
 run <- function(key, y, model, keep, cov) { D <- DS[[key]]; n <- sum(keep & D$rows)
-  if (n < 50) return(list(fit = list(b = NA, se = NA, p = NA, err = if (n == 0) "not asked in this phase" else sprintf("n = %d < 50", n), note = "", df = NA, used = model), n = n))   # 相位特异题
+  if (n < 50) return(list(fit = list(b = NA, se = NA, p = NA, err = if (n == 0) "not asked in this phase" else sprintf("n = %d < 50", n), note = "", df = NA, used = model), n = n))   # phase-specific items
   des <- D$des; des$variables$y <- y[D$rows]; ds <- subset(des, keep[D$rows]); list(fit = fit(model, ds, cov), n = n) }
 for (i in seq_len(nrow(A))) {
   v <- A$variable[i]; r <- A[i, ]; pr <- prep(v, r)
   women <- r$health_class == "reproductive_exposure"
   keep <- !is.na(pr$y) & complete.cases(d[, COV]) & (!women | d$sex == "2")
-# 空腹亚样本(两条并集):① 糖耐量组的血糖 / 胰岛素 / C 肽(HbA1c 除外),非晨间者不是空腹值,限定晨间亚样本并用其权重;
-#   ② 只在晨间亚样本里有值的变量(如 LDL,LCP)。
+# fasting subsample (union of two rules): (1) glucose / insulin / C-peptide of the glucose-tolerance group (not HbA1c), not fasting values outside the morning session, so restricted to the morning subsample with its weight;
+#   (2) variables measured only in the morning subsample (e.g. LDL, LCP).
   fast <- (grepl("DIABETES TESTING", r$section) && v != "GHP") || (sum(keep) >= 50 && mean(d$WTPFSD6[keep] > 0) > 0.95)
   cov <- if (women) setdiff(COV, "sex") else COV
   a1 <- run(if (fast) "fp1" else "p1", pr$y, pr$model, keep, cov); a2 <- run(if (fast) "fp2" else "p2", pr$y, pr$model, keep, cov)
-# 只在一期采集的项目:主分析用该期设计(该期权重 + PSU/层);判定只看两期有效样本量。
+# items collected in one phase only: main analysis uses that phase's design (its weight + PSU/strata); decided from valid sample sizes in the two phases only.
   key <- if (a1$n >= 50 && a2$n < 50) (if (fast) "fp1" else "p1") else if (a2$n >= 50 && a1$n < 50) (if (fast) "fp2" else "p2") else (if (fast) "fall" else "all")
   single <- key != (if (fast) "fall" else "all")
   a <- run(key, pr$y, pr$model, keep, cov)
@@ -185,24 +185,24 @@ for (i in seq_len(nrow(A))) {
     measure = c(gaussian = "beta (SD of phenotype per SD KSAA)", binomial = "OR per SD KSAA", ordinal = "OR per SD KSAA (proportional odds)",
                 `binomial (ordinal fallback)` = "OR per SD KSAA (any level above the lowest vs the lowest)", nominal = "joint test only")[[f$used]],
     model_used = f$used,
-    est = tr(f$b), lo = tr(f$b - qt(0.975, f$df) * f$se), hi = tr(f$b + qt(0.975, f$df) * f$se), p = f$p,   # CI 与 P 用同一自由度的 t 分布
+    est = tr(f$b), lo = tr(f$b - qt(0.975, f$df) * f$se), hi = tr(f$b + qt(0.975, f$df) * f$se), p = f$p,   # CI and P from the t distribution with the same df
     est_phase1 = tr(f1$b), p_phase1 = f1$p, est_phase2 = tr(f2$b), p_phase2 = f2$p,
-    replicated = if (single) NA else (!is.na(f1$b) && !is.na(f2$b) && sign(f1$b) == sign(f2$b) && f1$p < 0.05 && f2$p < 0.05),   # 单期项目无法做两期复制
+    replicated = if (single) NA else (!is.na(f1$b) && !is.na(f2$b) && sign(f1$b) == sign(f2$b) && f1$p < 0.05 && f2$p < 0.05),   # single-phase items cannot be replicated across phases
     notes = paste(c(pr$notes, f$note, if (single) "single-phase item: main analysis uses that phase's design; no cross-phase replication" else NULL), collapse = "; "), error = f$err, section = r$section, subsection = r$subsection, stringsAsFactors = FALSE)
   YN[[v]] <- if (pr$model == "nominal") NULL else { z <- rep(NA_real_, nrow(d)); z[keep] <- as.numeric(pr$y)[keep]; z }
   if (i %% 50 == 0) cat(sprintf("  %d / %d\n", i, nrow(A)))
 }
 R <- do.call(rbind, R); rownames(R) <- NULL
 FASTV <- sort(R$variable[R$set == "main" & grepl("WTPFSD", R$weight)])
-cat("空腹亚样本变量(主集):", paste(FASTV, collapse = ", "), "\n")
-stopifnot(setequal(FASTV, c("C1P", "C2P", "G1P", "G2P", "I1P", "I2P", "LCP")))   # 六项糖耐量/胰岛素 + LDL;HbA1c(GHP)不在其中
+cat("Fasting-subsample variables (main set):", paste(FASTV, collapse = ", "), "\n")
+stopifnot(setequal(FASTV, c("C1P", "C2P", "G1P", "G2P", "I1P", "I2P", "LCP")))   # six glucose-tolerance/insulin measures + LDL; HbA1c (GHP) is not among them
 
-# ---------- 多重校正:各集内 ----------
+# ---------- Multiple testing: within each set ----------
 liji <- function(M) { M <- M[, colSums(!is.na(M)) > 0, drop = FALSE]; C <- suppressWarnings(cor(M, use = "pairwise.complete.obs")); C[is.na(C)] <- 0; diag(C) <- 1
   ev <- eigen(C, symmetric = TRUE, only.values = TRUE)$values; ev[ev < 0] <- 0; sum(as.numeric(ev >= 1) + (ev - floor(ev))) }
 for (s in unique(R$set)) { k <- R$set == s & !is.na(R$p); R$fdr[k] <- p.adjust(R$p[k], "BH"); R$bonf[k] <- p.adjust(R$p[k], "bonferroni")
   vs <- R$variable[k & R$variable %in% names(YN)]; M <- do.call(cbind, YN[vs]); me <- liji(M); R$meff[k] <- me; R$p_liji[k] <- pmin(1, R$p[k] * me) }
-# 独立信号:主分析 FDR<5% 者按 P 升序贪心归并(与已选信号 |r| > 0.7 者归入其簇;r 用清洗后数值版,成对完整)
+# independent signals: main-analysis FDR < 5% merged greedily in order of P (|r| > 0.7 with a selected signal joins its cluster; r from cleaned numeric values, pairwise complete)
 k <- which(R$set == "main" & !is.na(R$fdr) & R$fdr < 0.05 & R$variable %in% names(YN)); k <- k[order(R$p[k])]
 R$clump_lead <- NA_character_; leads <- character()
 for (i in k) { v <- R$variable[i]; hit <- NA
@@ -213,16 +213,16 @@ R <- R[order(R$set != "main", R$p), ]
 write.csv(R, file.path(ew, "phewas_results.csv"), row.names = FALSE)
 
 sink(file.path(ew, "phewas_summary.txt"))
-cat("PheWAS(审核表 v1.2;KSAA → 表型;加权;协变量 年龄/性别/种族/教育/PIR)\n\n")
+cat("PheWAS (audit table v1.2; KSAA -> phenotype; weighted; covariates age/sex/race/education/PIR)\n\n")
 for (s in c("main", "supplementary", "exposure_module")) { k <- R$set == s
-  cat(sprintf("[%s] 表型 %d(拟合失败 %d);模型:%s;FDR<5%% %d;Bonferroni %d;Li–Ji meff %.0f → %d;两相位复制 %d\n", s, sum(k), sum(k & is.na(R$p)),
+  cat(sprintf("[%s] phenotypes %d (failed fits %d); models: %s; FDR<5%% %d; Bonferroni %d; Li-Ji meff %.0f -> %d; replicated in both phases %d\n", s, sum(k), sum(k & is.na(R$p)),
     paste(names(table(R$model[k])), table(R$model[k]), collapse = " "), sum(R$fdr[k] < 0.05, na.rm = TRUE), sum(R$bonf[k] < 0.05, na.rm = TRUE), R$meff[k][1], sum(R$p_liji[k] < 0.05, na.rm = TRUE), sum(R$replicated[k], na.rm = TRUE))) }
-cat(sprintf("\n主分析独立信号(FDR<5%% 者按 |r|>0.7 归并):%d 个;领头:%s\n", length(unique(na.omit(R$clump_lead))), paste(unique(na.omit(R$clump_lead)), collapse = " ")))
-cat("\n主分析 FDR<5% 按健康类别:\n"); print(table(R$health_class[R$set == "main" & R$fdr < 0.05]))
-cat("\n主分析前 30:\n"); k <- which(R$set == "main")[1:30]
+cat(sprintf("\nMain-analysis independent signals (FDR<5%% merged at |r|>0.7): %d; leads: %s\n", length(unique(na.omit(R$clump_lead))), paste(unique(na.omit(R$clump_lead)), collapse = " ")))
+cat("\nMain analysis FDR<5% by health class:\n"); print(table(R$health_class[R$set == "main" & R$fdr < 0.05]))
+cat("\nMain analysis top 30:\n"); k <- which(R$set == "main")[1:30]
 for (i in k) cat(sprintf("  %-9s %-46s %-9s n=%-5d %s %s  P=%.1e FDR=%.1e  ph1 %.2f/%.1e ph2 %.2f/%.1e %s\n", R$variable[i], substr(R$phenotype[i], 1, 46), R$model[i], R$n[i],
   ifelse(is.na(R$est[i]), "   -  ", sprintf("%6.2f", R$est[i])), ifelse(is.na(R$lo[i]), "", sprintf("(%.2f-%.2f)", R$lo[i], R$hi[i])), R$p[i], R$fdr[i], R$est_phase1[i], R$p_phase1[i], R$est_phase2[i], R$p_phase2[i], ifelse(R$replicated[i], "REP", "")))
-cat("\n拟合失败:\n"); print(R[is.na(R$p), c("variable", "phenotype", "model", "n", "error")], row.names = FALSE)
-cat("\n回退/重编码说明:\n"); print(table(R$notes[grepl("singular|merged", R$notes)]))
+cat("\nFailed fits:\n"); print(R[is.na(R$p), c("variable", "phenotype", "model", "n", "error")], row.names = FALSE)
+cat("\nFallback/recoding notes:\n"); print(table(R$notes[grepl("singular|merged", R$notes)]))
 sink()
 cat(readLines(file.path(ew, "phewas_summary.txt")), sep = "\n")

@@ -1,10 +1,10 @@
-# 加权主分析(模型部分;需要重复权重 bootstrap 的标准化风险与区分度在 weighted_boot.R)
-# 输出 results/analysis/weighted/:table2、tableS4、tableS5、tableS7、tableS10(+ _gait_extra)、figure3a、figure3_cells/_within、figureS3、model1_full_cohort(.csv);由 run_all.sh 运行
+# Weighted primary analyses (models; standardized risks and discrimination, which need replicate-weight bootstrap, are in weighted_boot.R)
+# Outputs in results/analysis/weighted/: table2, tableS4, tableS5, tableS7, tableS10 (+ _gait_extra), figure3a, figure3_cells/_within, figureS3, model1_full_cohort (.csv); run by run_all.sh
 source(here::here("code", "analysis", "weighted_common.R"))
 suppressMessages({library(mice); library(mitools)})
 
-# ---------------- 表 2:三个结局 × Models 1–3,每 SD 与四分位,P for trend ----------------
-cat("=========== 表 2(加权)===========\n")
+# ---------------- Table 2: three outcomes × Models 1–3, per SD and by quartile, P for trend ----------------
+cat("=========== Table 2 (weighted) ===========\n")
 T2 <- NULL
 for (o in names(EV)) for (mn in names(MODS)) { des <- dom6(F$cc); ev <- EV[[o]]
   a <- wcox(des, paste("z +", MODS[[mn]]), ev = ev)
@@ -16,8 +16,8 @@ for (o in names(EV)) for (mn in names(MODS)) { des <- dom6(F$cc); ev <- EV[[o]]
 write.csv(T2, file.path(W, "table2.csv"), row.names = FALSE)
 for (i in seq_len(nrow(T2))) with(T2[i, ], cat(sprintf("  %-8s %s  SD %s  Q2 %s  Q3 %s  Q4 %s  P trend %.3g\n", outcome, model, fci(hr_sd, lo_sd, hi_sd), fci(hr_q2, lo_q2, hi_q2), fci(hr_q3, lo_q3, hi_q3), fci(hr_q4, lo_q4, hi_q4), p_trend)))
 
-# ---------------- 表 S4:Fine–Gray(加权;finegray 展开后权重 = 调查权重 × fgwt,设计变量随行复制)----------------
-cat("\n=========== 表 S4 Fine–Gray(加权)===========\n")
+# ---------------- Table S4: Fine–Gray (weighted; after finegray expansion weight = survey weight × fgwt, design variables copied with each row) ----------------
+cat("\n=========== Table S4 Fine–Gray (weighted) ===========\n")
 C <- F[F$cc, ]; C$id <- seq_len(nrow(C))
 FG <- NULL
 for (et in c("cvd", "cancer")) {
@@ -33,8 +33,8 @@ for (et in c("cvd", "cancer")) {
 write.csv(FG, file.path(W, "tableS4.csv"), row.names = FALSE)
 for (i in seq_len(nrow(FG))) with(FG[i, ], cat(sprintf("  %-7s %s  SD %s  Q4 %s  P trend %.3g\n", outcome, model, fci(hr_sd, lo_sd, hi_sd), fci(hr_q4, lo_q4, hi_q4), p_trend)))
 
-# ---------------- 表 S5:敏感性分析(加权 Model 3;第 2 期各行用第 2 期设计)----------------
-cat("\n=========== 表 S5(加权)===========\n")
+# ---------------- Table S5: sensitivity analyses (weighted Model 3; phase 2 rows use the phase 2 design) ----------------
+cat("\n=========== Table S5 (weighted) ===========\n")
 spw <- SPW
 mt <- read.csv(file.path(spw, "metal_scan.csv")); mt$SEQN <- as.integer(sub("K.*", "", mt$roi)); art <- unique(mt$SEQN[mt$frac_top > 1e-3])
 resc <- unique(as.integer(sub("K.*", "", c(read.csv(file.path(spw, "boxes_rot.csv"))$stem, read.csv(file.path(spw, "boxes_lowconf.csv"))$stem))))
@@ -44,7 +44,7 @@ F$ab5 <- cut(F$age, c(59, 64, 69, 74, 79, 84, 120))
 dd <- d; dd$pooled <- resid(lm(pred_raw ~ age, dd)); fmn <- tapply(dd$gap, dd$fold, mean); dd$fcent <- dd$gap - fmn[as.character(dd$fold)]
 SDX <- sapply(c("gap_raw", "pooled", "fcent"), function(v) sd(dd[[v]]))
 for (v in c("pooled", "fcent")) F[[v]] <- dd[[v]][match(F$SEQN, dd$SEQN)]
-D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)        # 重建以带上新列
+D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)        # rebuilt to include the new columns
 F2 <- F[F$phase_all == 2 & !is.na(F$W2) & F$W2 > 0, ]; D2 <- svydesign(id = ~P2, strata = ~S2, weights = ~W2, nest = TRUE, data = F2)
 rhs3 <- function(sub, age_term = "age") { keep <- COV[!sapply(M3V, function(v) length(unique(F[sub, v])) < 2)]; keep[keep == "age"] <- age_term; paste(keep, collapse = " + ") }
 wrow <- function(lab, sub, des_fun = dom6, x = "z", k = 1, age_term = "age") { a <- wcox(des_fun(sub), paste(x, "+", rhs3(sub, age_term)), term = x, k = k)
@@ -69,7 +69,7 @@ S5 <- rbind(
   wrow("KSAA centred within each outer fold", cc, x = "fcent", k = SDX[["fcent"]]))
 u <- coxph(as.formula(paste("Surv(t, e) ~ z +", MODS[["m3"]])), F[cc, ]); ub <- coef(u)[["z"]]; use <- sqrt(vcov(u)["z", "z"])
 S5 <- rbind(S5, data.frame(label = "Unweighted", n = u$n, deaths = u$nevent, t(ci3(ub, use))))
-# 多重插补(mice 20 次,含 Nelson–Aalen 累积风险;每个插补数据集按研究队列建立调查设计)
+# Multiple imputation (mice, 20 imputations, including the Nelson–Aalen cumulative hazard; survey design built on the study cohort in each imputed data set)
 IV <- c("edu3", "smk3", "alc3", "pa3", "bmi", "htn", "dm", "tc", "hdl", "egfr", "cvd_hist", "cancer_hist")
 di <- d[, c("t", "e", "e_cvd", "e_cancer", "gap", "z", "q", "age", "sex", "race", IV, "WTPFEX6", "SDPPSU6", "SDPSTRA6")]
 for (v in c("sex", "race", "htn", "dm", "cvd_hist", "cancer_hist")) di[[v]] <- factor(di[[v]])
@@ -85,10 +85,10 @@ ev_rr <- function(h) { rr <- (1 - 0.5^sqrt(h)) / (1 - 0.5^sqrt(1 / h)); rr + sqr
 S5$evalue <- NA; S5$evalue[1] <- ev_rr(hr); S5$evalue_ci <- NA; S5$evalue_ci[1] <- ev_rr(lo)
 write.csv(S5, file.path(W, "tableS5.csv"), row.names = FALSE)
 for (i in seq_len(nrow(S5))) with(S5[i, ], cat(sprintf("  %-58s %5d / %5d  %s\n", label, deaths, n, fci(hr, lo, hi))))
-cat(sprintf("  E 值 %.2f(置信限 %.2f)\n", S5$evalue[1], S5$evalue_ci[1]))
+cat(sprintf("  E-value %.2f (confidence limit %.2f)\n", S5$evalue[1], S5$evalue_ci[1]))
 
-# ---------------- 表 S7:KSAA 与 K–L / BMD 同入 Model 3(K–L 用第 2 期设计)----------------
-cat("\n=========== 表 S7(加权)===========\n")
+# ---------------- Table S7: KSAA with K–L / BMD in Model 3 (K–L uses the phase 2 design) ----------------
+cat("\n=========== Table S7 (weighted) ===========\n")
 J <- NULL
 for (v in c("klmax", "fn_bmd", "tot_bmd")) { sub <- cc & !is.na(F[[v]]); df <- if (v == "klmax") dom2 else dom6; if (v == "klmax") sub <- sub & F$phase_all == 2
   F$m <- (F[[v]] - mean(F[[v]][sub])) / sd(F[[v]][sub]); D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)
@@ -98,10 +98,10 @@ for (v in c("klmax", "fn_bmd", "tot_bmd")) { sub <- cc & !is.na(F[[v]]); df <- i
     J <- rbind(J, data.frame(marker = v, outcome = o, n = a[["n"]], events = a[["events"]], hr_alone = a[["hr"]], lo_alone = a[["lo"]], hi_alone = a[["hi"]],
       hr_ksaa = kz[["hr"]], lo_ksaa = kz[["lo"]], hi_ksaa = kz[["hi"]], hr_marker = km[["hr"]], lo_marker = km[["lo"]], hi_marker = km[["hi"]])) } }
 write.csv(J, file.path(W, "tableS7.csv"), row.names = FALSE)
-for (i in seq_len(nrow(J))) with(J[i, ], cat(sprintf("  %-8s %-8s %5d/%5d  KSAA 单独 %s | 同入 KSAA %s,标志物 %s\n", marker, outcome, events, n, fci(hr_alone, lo_alone, hi_alone), fci(hr_ksaa, lo_ksaa, hi_ksaa), fci(hr_marker, lo_marker, hi_marker))))
+for (i in seq_len(nrow(J))) with(J[i, ], cat(sprintf("  %-8s %-8s %5d/%5d  KSAA alone %s | joint KSAA %s, marker %s\n", marker, outcome, events, n, fci(hr_alone, lo_alone, hi_alone), fci(hr_ksaa, lo_ksaa, hi_ksaa), fci(hr_marker, lo_marker, hi_marker))))
 
-# ---------------- 图 3A:KSAA 与 PhenoAge 加速同入(年龄 + 性别),两个 log HR 之差的 Wald 检验 ----------------
-cat("\n=========== 图 3A(加权)===========\n")
+# ---------------- Figure 3A: KSAA and PhenoAge acceleration in one model (age + sex), Wald test of the difference between the two log HRs ----------------
+cat("\n=========== Figure 3A (weighted) ===========\n")
 sp <- F$inc & !is.na(F$pa_accel)
 F$zg <- (F$gap - mean(F$gap[sp])) / sd(F$gap[sp]); F$zm <- (F$pa_accel - mean(F$pa_accel[sp])) / sd(F$pa_accel[sp])
 D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)
@@ -111,10 +111,10 @@ for (o in names(EV)) { m <- svycoxph(as.formula(sprintf("Surv(t, %s) ~ zg + zm +
   WD <- rbind(WD, data.frame(outcome = o, n = m$n, events = m$nevent, t(setNames(ci3(b[["zg"]], sqrt(V["zg", "zg"])), c("hr_ksaa", "lo_ksaa", "hi_ksaa"))),
     t(setNames(ci3(b[["zm"]], sqrt(V["zm", "zm"])), c("hr_pa", "lo_pa", "hi_pa"))), ratio = exp(dif), ratio_lo = exp(dif - 1.96 * sed), ratio_hi = exp(dif + 1.96 * sed), p_diff = 2 * pnorm(-abs(dif / sed)))) }
 write.csv(WD, file.path(W, "figure3a.csv"), row.names = FALSE)
-for (i in seq_len(nrow(WD))) with(WD[i, ], cat(sprintf("  %-8s KSAA %s | PhenoAge %s | 比值 %s  P %.2g\n", outcome, fci(hr_ksaa, lo_ksaa, hi_ksaa), fci(hr_pa, lo_pa, hi_pa), fci(ratio, ratio_lo, ratio_hi), p_diff)))
+for (i in seq_len(nrow(WD))) with(WD[i, ], cat(sprintf("  %-8s KSAA %s | PhenoAge %s | ratio %s  P %.2g\n", outcome, fci(hr_ksaa, lo_ksaa, hi_ksaa), fci(hr_pa, lo_pa, hi_pa), fci(ratio, ratio_lo, ratio_hi), p_diff)))
 
-# ---------------- 图 3C–E:四分位交叉分格;各 PhenoAge 四分位内 KSAA 每 SD(切点为未加权四分位)----------------
-cat("\n=========== 图 3C–E(加权)===========\n")
+# ---------------- Figure 3C–E: cross-classified quartiles; KSAA per SD within each PhenoAge quartile (unweighted quartile cut points) ----------------
+cat("\n=========== Figure 3C–E (weighted) ===========\n")
 qg <- quantile(F$gap[sp], 0:4 / 4); qm <- quantile(F$pa_accel[sp], 0:4 / 4)
 F$qk <- cut(F$gap, qg, include.lowest = TRUE, labels = QL); F$qp <- cut(F$pa_accel, qm, include.lowest = TRUE, labels = QL)
 F$cell <- relevel(factor(ifelse(sp, paste0(F$qk, "_", F$qp), NA)), ref = "Q1_Q1")
@@ -128,10 +128,10 @@ for (o in names(EV)) { m <- svycoxph(as.formula(sprintf("Surv(t, %s) ~ cell + ag
 qhet <- function(w) { b <- log(w$hr); se <- (log(w$hi) - log(w$lo)) / (2 * qnorm(.975)); wt <- 1 / se^2; pchisq(sum(wt * (b - sum(wt * b) / sum(wt))^2), length(b) - 1, lower.tail = FALSE) }
 write.csv(JC, file.path(W, "figure3_cells.csv"), row.names = FALSE); write.csv(JW, file.path(W, "figure3_within.csv"), row.names = FALSE)
 for (o in c("allcause", "cvd")) { w <- JW[JW$outcome == o, ]; c44 <- JC[JC$outcome == o & JC$y == "Q4" & JC$x == "Q4", ]
-  cat(sprintf("  %-8s 各档内 KSAA 每 SD %s–%s,P 异质性 %.2f;Q4×Q4 %s\n", o, f2(min(w$hr)), f2(max(w$hr)), qhet(w), fci(c44$hr, c44$hr_lo, c44$hr_hi))) }
+  cat(sprintf("  %-8s KSAA per SD within strata %s–%s, P heterogeneity %.2f; Q4×Q4 %s\n", o, f2(min(w$hr)), f2(max(w$hr)), qhet(w), fci(c44$hr, c44$hr_lo, c44$hr_hi))) }
 
-# ---------------- 图 S3:亚组(加权 Model 3;影像 OA 用第 2 期设计)----------------
-cat("\n=========== 图 S3(加权)===========\n")
+# ---------------- Figure S3: subgroups (weighted Model 3; radiographic OA uses the phase 2 design) ----------------
+cat("\n=========== Figure S3 (weighted) ===========\n")
 DX0 <- read.csv(file.path(SPW, "dxa_all.csv"))[, c("SEQN", "BDPFNBMD")]
 q8b <- function(x) { x <- suppressWarnings(as.numeric(x)); for (k in 1:6) { s8 <- as.numeric(strrep("8", k)); lo <- x[!is.na(x) & x < s8]; if (any(x == s8, na.rm = TRUE) && length(lo) && s8 >= max(lo) * 1.5) x[x == s8] <- NA }; x }
 DX0$BDPFNBMD <- q8b(DX0$BDPFNBMD)
@@ -153,8 +153,8 @@ ref <- do.call(rbind, lapply(c("allcause", "cvd"), function(o) { a <- wcox(dom6(
 SG <- rbind(ref, SG); write.csv(SG, file.path(W, "figureS3.csv"), row.names = FALSE)
 for (i in seq_len(nrow(SG))) with(SG[i, ], cat(sprintf("  %-8s %-26s %-20s %5d  %s  %s\n", outcome, fam, lev, n, fci(hr, lo, hi), if (is.na(p_het)) "" else sprintf("P %.3f", p_het))))
 
-# ---------------- 表 S10:骨折、跌倒与躯体功能(加权 logistic / 线性)----------------
-cat("\n=========== 表 S11(加权)===========\n")
+# ---------------- Table S10: fracture, falls and physical function (weighted logistic / linear) ----------------
+cat("\n=========== Table S10 (weighted) ===========\n")
 OUT <- c(fx_hip = "logistic", fx_frag = "logistic", fx_spi = "logistic", fx_wri = "logistic", fx_any = "logistic", fall = "logistic", gait = "linear",
          tand_fail = "logistic", dif_HAH1 = "logistic", dif_HAH2 = "logistic", dif_HAH8 = "logistic", dif_HAH9 = "logistic")
 wglm <- function(des, y, rhs, type) { m <- svyglm(as.formula(paste(y, "~ z +", rhs)), design = des, family = if (type == "logistic") quasibinomial() else gaussian())
@@ -169,20 +169,20 @@ for (y in names(OUT)) { s <- cc & !is.na(F[[y]]); sb <- s & !is.na(F$tot_bmd)
     m1 = r[1, "m1"], m1_lo = r[2, "m1"], m1_hi = r[3, "m1"], m2 = r[1, "m2"], m2_lo = r[2, "m2"], m2_hi = r[3, "m2"], m3 = r[1, "m3"], m3_lo = r[2, "m3"], m3_hi = r[3, "m3"],
     n_b = sum(sb), events_b = if (OUT[[y]] == "logistic") sum(F[[y]][sb]) else NA, m3b0 = a[1], m3b0_lo = a[2], m3b0_hi = a[3], m3b = b[1], m3b_lo = b[2], m3b_hi = b[3], retained = ret)) }
 write.csv(S11, file.path(W, "tableS10.csv"), row.names = FALSE)
-for (i in seq_len(nrow(S11))) with(S11[i, ], cat(sprintf("  %-9s %4s/%4d  M1 %s  M3 %s | DXA 子集 %s -> +BMD %s  保留 %s\n", y, ifelse(is.na(events), "—", events), n,
+for (i in seq_len(nrow(S11))) with(S11[i, ], cat(sprintf("  %-9s %4s/%4d  M1 %s  M3 %s | DXA subset %s -> +BMD %s  retained %s\n", y, ifelse(is.na(events), "—", events), n,
   fci(m1, m1_lo, m1_hi), fci(m3, m3_lo, m3_hi), fci(m3b0, m3b0_lo, m3b0_hi), fci(m3b, m3b_lo, m3b_hi), ifelse(is.na(retained), "—", sprintf("%.0f%%", 100 * retained)))))
 
 cat("\n-> results/analysis/weighted/\n")
 
-# ---------------- 图 1D:全队列、年龄 + 性别的加权 HR(与图 2 曲线同口径)----------------
+# ---------------- Figure 1D: weighted HR in the full cohort, age + sex (same basis as the Figure 2 curves) ----------------
 M1F <- do.call(rbind, lapply(names(EV), function(o) { a <- wcox(dom6(F$inc), "z + age + factor(sex)", ev = EV[[o]]); data.frame(outcome = o, n = a[["n"]], events = a[["events"]], hr_sd = a[["hr"]], lo_sd = a[["lo"]], hi_sd = a[["hi"]]) }))
 write.csv(M1F, file.path(W, "model1_full_cohort.csv"), row.names = FALSE)
-for (i in seq_len(nrow(M1F))) with(M1F[i, ], cat(sprintf("  图 1D 全队列年龄 + 性别 %-8s %s\n", outcome, fci(hr_sd, lo_sd, hi_sd))))
+for (i in seq_len(nrow(M1F))) with(M1F[i, ], cat(sprintf("  Figure 1D full cohort, age + sex %-8s %s\n", outcome, fci(hr_sd, lo_sd, hi_sd))))
 
-# ---------------- 表 S10 注:步速的附加调整(加权;膝痛,或第二期 K–L 分级)----------------
+# ---------------- Table S10 note: additional adjustment of gait speed (weighted; knee pain, or phase 2 K–L grade) ----------------
 wgait <- function(des, rhs) { m <- svyglm(as.formula(paste("gait ~ z +", rhs)), design = des); b <- coef(m)[["z"]]; se <- sqrt(vcov(m)["z", "z"]); q <- qt(0.975, degf(des)); 100 * c(b, b - q * se, b + q * se) }
 sp <- F$cc & !is.na(F$gait) & !is.na(F$pain); sk <- F$cc & !is.na(F$gait) & !is.na(F$klmax)
 gp <- wgait(dom6(sp), paste(MODS[["m3"]], "+ pain")); gk <- wgait(dom2(sk), paste(MODS[["m3"]], "+ klmax"))
 GX <- data.frame(item = c("gait_m3_pain", "gait_m3_kl"), n = c(sum(sp), sum(sk)), est = c(gp[1], gk[1]), lo = c(gp[2], gk[2]), hi = c(gp[3], gk[3]))
 write.csv(GX, file.path(W, "tableS10_gait_extra.csv"), row.names = FALSE)
-for (i in 1:2) with(GX[i, ], cat(sprintf("  步速 %-13s n %d  %.1f (%.1f 至 %.1f) cm/s\n", item, n, est, lo, hi)))
+for (i in 1:2) with(GX[i, ], cat(sprintf("  gait speed %-13s n %d  %.1f (%.1f to %.1f) cm/s\n", item, n, est, lo, hi)))

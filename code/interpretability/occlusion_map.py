@@ -1,9 +1,9 @@
-# 遮挡敏感度图:在一侧膝上滑动 64 × 64 像素(@448)的方块,逐处高斯模糊(σ = 16,同 saliency.py --occlude),对侧膝不动,
-#   记录 5 个全数据模型集成的预测年龄变化;每个像素取覆盖它的各方块 |Δ 预测年龄| 的均值(另存带符号均值)。
-#   衡量模型实际依赖的区域,不受 Grad-CAM 粗网格(14 × 14)放大的影响。集成权重同 saliency.py(内部验证 MAE 倒数)。
-# 输入:results/analysis/saliency/ 下 ksaa_for_saliency.csv;ROI 影像(KNEE_ROI)与 models/ 下全数据模型。
-# 输出:results/analysis/saliency/occlusion_map<tag>.npz(SEQN、各膝 112 × 112 的 |Δ| 与带符号 Δ 图、基线预测)。
-# 跑法(仓库根目录下,需 GPU):python code/interpretability/occlusion_map.py --seqn 1587,41357 --side R [--tag _examples]
+# Occlusion sensitivity maps: slide a 64 x 64-pixel (@448) patch over one knee, Gaussian-blurring each position (sigma = 16, as in saliency.py --occlude) with the other knee unchanged,
+#   and record the change in the 5 full-data models' ensemble predicted age; each pixel gets the mean |Δ predicted age| over the patches covering it (signed mean also saved).
+#   Measures the regions the model actually relies on, without the upsampling of the coarse Grad-CAM grid (14 x 14). Ensemble weights as in saliency.py (inverse internal-validation MAE).
+# Input: ksaa_for_saliency.csv in results/analysis/saliency/; ROI images (KNEE_ROI) and the full-data models in models/.
+# Output: results/analysis/saliency/occlusion_map<tag>.npz (SEQN, 112 x 112 |Δ| and signed Δ maps per knee, baseline predictions).
+# Run (from the repository root, needs a GPU): python code/interpretability/occlusion_map.py --seqn 1587,41357 --side R [--tag _examples]
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -11,11 +11,11 @@ from saliency_common import OUT, MODELS, SNAP, S, R, roi_file, pre
 sys.path.insert(0, SNAP)
 import torch, torch.nn.functional as F, torchvision.models as tvm
 import torchvision.transforms.functional as TF
-for _a in ["resnet18", "resnet50", "efficientnet_b0", "convnext_tiny", "densenet121"]:   # 权重来自存档,不下载 ImageNet 权重
+for _a in ["resnet18", "resnet50", "efficientnet_b0", "convnext_tiny", "densenet121"]:   # weights come from the checkpoints; do not download ImageNet weights
     _f = getattr(tvm, _a); setattr(tvm, _a, (lambda f: (lambda *a, **k: f(weights=None)))(_f)); tvm.__dict__[_a] = getattr(tvm, _a)
 from mammo_age_model import Mammo_AGE
 
-ap = argparse.ArgumentParser(); ap.add_argument("--seqn", required=True, help="逗号分隔;'heldout' = 内部验证集 487 人")
+ap = argparse.ArgumentParser(); ap.add_argument("--seqn", required=True, help="comma-separated; 'heldout' = the 487 internal-validation participants")
 ap.add_argument("--side", default="R", choices=["L", "R"]); ap.add_argument("--patch", type=int, default=64); ap.add_argument("--stride", type=int, default=16)
 ap.add_argument("--bs", type=int, default=64); ap.add_argument("--tag", default=""); A = ap.parse_args()
 DEV = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
@@ -34,7 +34,7 @@ POS = [(r0, c0) for r0 in P0 for c0 in P0]
 print(f"{len(SEQ)} participants, side {A.side}, {len(POS)} patches of {A.patch}px (stride {A.stride}), device {DEV}", flush=True)
 AR = torch.arange(100, dtype=torch.float32, device=DEV)
 
-def predict(xu):                                                     # xu:[B,2,S,S] 单位灰度 → 集成预测年龄 [B]
+def predict(xu):                                                     # xu: [B,2,S,S] unit gray -> ensemble predicted age [B]
     out = 0
     for k, (m, par) in models.items():
         x = ((xu - par["mu"]) / par["sd"])[:, :, None]
@@ -45,7 +45,7 @@ def predict(xu):                                                     # xu:[B,2,S
 
 ABS = np.zeros((len(SEQ), R, R), np.float32); SGN = np.zeros((len(SEQ), R, R), np.float32); BASE = np.zeros(len(SEQ)); t0 = time.time()
 for n, s in enumerate(SEQ):
-    u = torch.stack([pre(roi_file(s, sd), sd) for sd in "LR"]).float().to(DEV)          # [2,S,S],L 已镜像
+    u = torch.stack([pre(roi_file(s, sd), sd) for sd in "LR"]).float().to(DEV)          # [2,S,S], L already mirrored
     bl = TF.gaussian_blur(u[V][None, None], kernel_size=97, sigma=16.0)[0, 0]
     base = float(predict(u[None])[0]); BASE[n] = base
     acc_a = torch.zeros(S, S, device=DEV); acc_s = torch.zeros(S, S, device=DEV); cnt = torch.zeros(S, S, device=DEV)

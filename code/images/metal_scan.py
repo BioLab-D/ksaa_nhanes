@@ -1,12 +1,12 @@
-"""全样本金属植入物筛查。
+"""Screen the full sample for metal implants.
 
-动机:低置信度救援片的目视表里,明显有一批全膝置换/螺钉/钢板。如果金属只
-富集在"救援"这一组,那先前把它们排除在外 = 系统性地剔掉了关节置换患者
-—— 这个人群与重度 OA、以及"有条件做手术"(医疗可及性)双向相关,非随机缺失。
+Motivation: visual review of the low-confidence rescued films showed many total knee replacements/screws/plates. If metal
+is concentrated in the rescued group, excluding them would systematically remove joint-replacement patients
+- a group related both to severe OA and to access to surgery (health care access), i.e. not missing at random.
 
-判据:金属在 X 光上是饱和平台,而骨的最亮处只是零星像素。因此用
-frac_top = 该图中 >= 0.995*max 的像素占比。正常膝该值极小(孤立峰),
-金属会形成成片高值。阈值不预设,先看两组分布再定。
+Criterion: metal forms a saturated plateau on radiographs, whereas the brightest bone is only scattered pixels. Hence
+frac_top = fraction of pixels >= 0.995*max in the image. It is tiny for normal knees (isolated peaks),
+while metal forms contiguous high values. No threshold is preset; it is chosen after looking at both distributions.
 """
 import os, re, csv, glob, numpy as np
 from multiprocessing import Pool
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     for name, ft, _ in res:
         stem = name.rsplit("_",1)[0]
         grp["lowconf" if stem in low else "rot" if stem in rot else "main"].append(ft)
-    print(f"{'组':<10}{'n':>7}{'中位':>12}{'p90':>12}{'p99':>12}{'>1e-3 占比':>12}")
+    print(f"{'group':<10}{'n':>7}{'median':>12}{'p90':>12}{'p99':>12}{'frac >1e-3':>12}")
     for k,v in grp.items():
         v = np.array(v)
         print(f"{k:<10}{len(v):>7}{np.median(v):>12.2e}{np.percentile(v,90):>12.2e}"

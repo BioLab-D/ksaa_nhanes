@@ -1,7 +1,7 @@
-# 加权主分析的公共设置(CDC 膝 / 手 X 光数据说明要求影像相关分析使用体检样本权重;加权为主分析,不加权为敏感性分析)。
-# 做法:先在**全部 NHANES III 成人体检者**(WTPFEX6 > 0,8,805 + 8,900 人)上建立完整调查设计,再以研究子样本为 domain 取 subset;
-#   仅第二期的分析(K–L 判读)用第二期权重 WTPFEX2 与 SDPPSU2 / SDPSTRA2,在全部第二期体检者上建设计后取 subset。
-# 由 weighted.R(模型)与 weighted_boot.R(重复权重的 bootstrap)source。
+# Shared setup for the weighted primary analyses (the CDC knee / hand X-ray documentation requires examination sample weights for radiograph analyses; weighted = primary, unweighted = sensitivity).
+# Approach: build the full survey design on **all NHANES III adult examinees** (WTPFEX6 > 0, 8,805 + 8,900 people), then subset to the study sample as a domain;
+#   phase 2-only analyses (K–L reading) use the phase 2 weight WTPFEX2 and SDPPSU2 / SDPSTRA2, with the design built on all phase 2 examinees and then subset.
+# Sourced by weighted.R (models) and weighted_boot.R (replicate-weight bootstrap).
 suppressMessages({library(survival); library(survey); library(splines); library(duckdb)})
 options(survey.lonely.psu = "adjust")
 RES <- here::here("results"); V3 <- file.path(RES, "analysis"); SPW <- file.path(RES, "work")
@@ -34,11 +34,11 @@ stopifnot(sum(F$cc) == 4347)
 D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)
 F2 <- F[F$phase_all == 2 & !is.na(F$W2) & F$W2 > 0, ]
 D2 <- svydesign(id = ~P2, strata = ~S2, weights = ~W2, nest = TRUE, data = F2)
-dom6 <- function(x) subset(D6, x)                       # x: 与 F 等长的逻辑向量
+dom6 <- function(x) subset(D6, x)                       # x: logical vector as long as F
 dom2 <- function(x) subset(D2, x[match(F2$SEQN, F$SEQN)])
 
 ci3 <- function(b, se, k = 1) c(hr = exp(k * b), lo = exp(k * (b - 1.96 * se)), hi = exp(k * (b + 1.96 * se)))
-wcox <- function(des, rhs, term = "z", ev = "e", k = 1) {   # 加权 Cox;返回该项 HR / CI / P 与 domain 的人数、事件数
+wcox <- function(des, rhs, term = "z", ev = "e", k = 1) {   # weighted Cox; returns the term's HR / CI / P and the domain's n and events
   m <- svycoxph(as.formula(sprintf("Surv(t, %s) ~ %s", ev, rhs)), design = des)
   b <- coef(m)[[term]]; se <- sqrt(vcov(m)[term, term]); dd <- model.frame(des)
   c(ci3(b, se, k), p = 2 * pnorm(-abs(b / se)), n = m$n, events = m$nevent)

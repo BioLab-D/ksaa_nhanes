@@ -1,8 +1,8 @@
-# 解释性分析 · 作图与定量(Fig. S2);输入由 saliency_images.py 与 saliency.py --heldout [--occlude] 产生。
-#   默认版式:内部验证集中 3 对同性别、年龄差 ≤ 1 岁的示例(KSAA 接近全队列第 90 / 第 10 百分位),右膝原图 + Grad-CAM。
-#   定量输出(saliency_summary.txt / saliency_regions.csv):年龄与 KSAA 差值图的相关(零分布 = 年龄层内打乱 KSAA)、
-#   6 个解剖区的富集比与遮挡后 MAE 增量(bootstrap CI)。
-# 跑法(仓库根目录下):python code/interpretability/saliency_figure.py
+# Interpretability figures and quantification (Fig. S2); inputs come from saliency_images.py and saliency.py --heldout [--occlude].
+#   Default layout: 3 same-sex example pairs from the internal validation set, age difference <= 1 year (KSAA near the cohort's 90th / 10th percentile), right-knee image + Grad-CAM.
+#   Quantitative output (saliency_summary.txt / saliency_regions.csv): correlation of the age and KSAA difference maps (null = KSAA permuted within age strata),
+#   enrichment ratios of the 6 anatomical regions and MAE increase after occlusion (bootstrap CI).
+# Run (from the repository root): python code/interpretability/saliency_figure.py
 import os, sys, csv, numpy as np, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt, matplotlib.gridspec as gridspec, torch, torch.nn.functional as F
@@ -10,25 +10,25 @@ from matplotlib.colors import LinearSegmentedColormap
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from saliency_common import KB, OUT, R, REG, roi_file, pre, regions, otsu
 plt.rcParams.update({"font.family": "Arial", "font.size": 7, "axes.linewidth": 0.4, "pdf.fonttype": 42, "svg.fonttype": "none"})
-INK, INK2, MUTED = "#0b0b0b", "#52514e", "#898781"; Q1C, Q4C = "#9DB4C8", "#C8372D"      # 四分位配色同正文图
+INK, INK2, MUTED = "#0b0b0b", "#52514e", "#898781"; Q1C, Q4C = "#9DB4C8", "#C8372D"      # quartile colors as in the main figures
 import argparse; ap = argparse.ArgumentParser(); ap.add_argument("--tag", default="_heldout"); ap.add_argument("--out", default="")
 ap.add_argument("--layout", default="examples", choices=["examples", "full"]); A = ap.parse_args()
-# --layout full:六格版(未入稿);--tag _n40 --out <目录>:只作排版调试
+# --layout full: six-panel version (not in the manuscript); --tag _n40 --out <dir>: layout debugging only
 TEST = A.tag != "_heldout"; FIGD = A.out or os.path.join(KB, "results", "figures"); SUM = A.out or OUT
 rng = np.random.default_rng(20260922); NB = 100 if TEST else 500
 mi = lambda s: s.replace("-", "−")
 f1 = lambda x: mi(f"{x:.1f}"); f2 = lambda x: mi(f"{x:.2f}")
 
-# ---------- 全队列:平均图与差值图 ----------
+# ---------- whole cohort: mean and difference maps ----------
 rows = list(csv.DictReader(open(os.path.join(OUT, "ksaa_for_saliency.csv"))))
 assert [r["SEQN"] for r in rows] == open(os.path.join(OUT, "img_all_seqn.txt")).read().split()
-I = np.load(os.path.join(OUT, "img_all.npy")).astype(np.float32).mean(1)                 # 两膝平均 [N,R,R]
+I = np.load(os.path.join(OUT, "img_all.npy")).astype(np.float32).mean(1)                 # mean of both knees [N,R,R]
 age = np.array([float(r["age"]) for r in rows]); gap = np.array([float(r["gap"]) for r in rows]); sex = np.array([int(r["sex"]) for r in rows])
-qc = np.quantile(gap, [.25, .5, .75]); Q = np.digitize(gap, qc)                           # 与 R 的 quantile(type 7)相同
+qc = np.quantile(gap, [.25, .5, .75]); Q = np.digitize(gap, qc)                           # same as R quantile (type 7)
 band = np.minimum(((age - 60) // 5).astype(int), 5)                                     # 60–64 … 85–90
 yng, old = age < 65, age >= 80
 def std_means(a, b, idx=None):
-    """a、b 两组在 5 岁年龄层内的均值,按层内两组合计人数加权(年龄标化)。idx:bootstrap 抽样下标。"""
+    """Means of groups a and b within 5-year age strata, weighted by the combined stratum size (age-standardized). idx: bootstrap sample indices."""
     ii = np.arange(len(age)) if idx is None else idx; ma = mb = 0.0; wt = 0
     for s in range(6):
         ia = ii[(band[ii] == s) & a[ii]]; ib = ii[(band[ii] == s) & b[ii]]
@@ -38,18 +38,18 @@ def std_means(a, b, idx=None):
 MY, MO = I[yng].mean(0), I[old].mean(0); DA = MO - MY
 K1, K4 = std_means(Q == 0, Q == 3); DK = K4 - K1
 C = slice(8, R - 8); pr = lambda a, b: np.corrcoef(a[C, C].ravel(), b[C, C].ravel())[0, 1]
-r_map = pr(DA, DK); perm = []                                                            # 零分布:5 岁年龄层内打乱 KSAA(bootstrap 会系统性低估 r)
+r_map = pr(DA, DK); perm = []                                                            # null: KSAA permuted within 5-year age strata (the bootstrap would systematically underestimate r)
 for _ in range(NB):
     gp = gap.copy()
     for s_ in range(6): k_ = np.where(band == s_)[0]; gp[k_] = gp[rng.permutation(k_)]
     Qp = np.digitize(gp, qc); a_, b_ = std_means(Qp == 3, Qp == 0); perm.append(pr(DA, a_ - b_))
 r_null = np.percentile(np.abs(perm), 95)
-slope = np.polyfit(DA[C, C].ravel(), DK[C, C].ravel(), 1)[0]                        # 幅度:KSAA 差值图对年龄差值图的回归斜率(1 = 同样大)
-# 差值图的区域汇总(同一解剖分区,基于全队列平均图的关节线)
+slope = np.polyfit(DA[C, C].ravel(), DK[C, C].ravel(), 1)[0]                        # magnitude: slope of the KSAA difference map on the age difference map (1 = equally large)
+# regional summary of the difference maps (same anatomical regions, joint line of the cohort mean image)
 REGM, jm = regions(I.mean(0))
 def reg_mean(D): return [float(D[m].mean()) for m in REGM]
 
-# ---------- 内部验证集:Grad-CAM ----------
+# ---------- internal validation set: Grad-CAM ----------
 ho = list(csv.DictReader(open(os.path.join(OUT, f"saliency_pred{A.tag}.csv"))))
 CAM = np.load(os.path.join(OUT, f"cam{A.tag}.npy")).astype(np.float32); IH = np.load(os.path.join(OUT, f"img{A.tag}.npy")).astype(np.float32)
 n_ho = len(ho); assert CAM.shape[0] == n_ho and (TEST or n_ho == 487)
@@ -60,8 +60,8 @@ for i in range(n_ho):
     for v in range(2):
         M, JL[i, v] = regions(IH[i, v]); c = CAM[i, v] / CAM[i, v].sum()
         share[i, v] = [c[m].sum() for m in M]; area[i, v] = [m.mean() for m in M]
-        b = IH[i, v] > otsu(IH[i, v]); b &= ~(M[2] | M[3]); bone_sh[i, v] = c[b].sum(); bone_ar[i, v] = b.mean()   # 骨 = Otsu 以上且不在关节带
-sh, ar = share.mean(1), area.mean(1)                                                     # 每人两膝平均
+        b = IH[i, v] > otsu(IH[i, v]); b &= ~(M[2] | M[3]); bone_sh[i, v] = c[b].sum(); bone_ar[i, v] = b.mean()   # bone = above Otsu and outside the joint band
+sh, ar = share.mean(1), area.mean(1)                                                     # per participant, mean of both knees
 def boot_ratio(num, den):
     est = num.mean(0) / den.mean(0); b = []
     for _ in range(NB):
@@ -71,21 +71,21 @@ enr, enr_ci = boot_ratio(sh, ar)
 bone_enr, bone_ci = boot_ratio(bone_sh.mean(1)[:, None], bone_ar.mean(1)[:, None])
 MCAM = CAM.mean((0, 1))
 
-# ---------- 遮挡检验 ----------
+# ---------- occlusion test ----------
 labs = ["None"] + REG
-if TEST:                                                                                 # 调试:以不遮挡预测 + 噪声代替
+if TEST:                                                                                 # debugging: unoccluded prediction + noise instead
     E = np.repeat(pH[:, None], 7, 1) + rng.normal(0, 1, (n_ho, 7)) * (np.arange(7) > 0); occ = [{"region": labs[g], "SEQN": ho[i]["SEQN"]} for i in range(n_ho) for g in range(7)]
 else:
     occ = list(csv.DictReader(open(os.path.join(OUT, f"occlusion{A.tag}.csv")))); E = np.array([float(r["pred_full_ens"]) for r in occ]).reshape(n_ho, 7)
 assert [r["region"] for r in occ[:7]] == labs and [occ[7 * i]["SEQN"] for i in range(n_ho)] == [r["SEQN"] for r in ho]
-assert np.allclose(E[:, 0], pH, atol=0.05)                                                # 不遮挡 = Grad-CAM 运行的前向
+assert np.allclose(E[:, 0], pH, atol=0.05)                                                # unoccluded = forward pass of the Grad-CAM run
 AE = np.abs(E - aH[:, None]); dMAE = AE[:, 1:] - AE[:, [0]]; shift = E[:, 1:] - E[:, [0]]
 def boot_mean(x):
     b = [x[rng.integers(0, len(x), len(x))].mean(0) for _ in range(NB)]; return x.mean(0), np.percentile(b, [2.5, 97.5], axis=0)
 dmae, dmae_ci = boot_mean(dMAE); sft, sft_ci = boot_mean(shift)
 r_occ = [np.corrcoef(E[:, g], aH)[0, 1] for g in range(7)]
 
-# ---------- 示例对 ----------
+# ---------- example pairs ----------
 p10, p90 = np.percentile(gap, [10, 90]); seqH = [r["SEQN"] for r in ho]; sexH = np.array([sH[s] for s in seqH])
 pairs = []
 for lo, hi in [(60, 70), (70, 80), (80, 91)]:
@@ -96,7 +96,7 @@ for lo, hi in [(60, 70), (70, 80), (80, 91)]:
             j = min(js, key=lambda j: abs(gH[j] - p10))
             if gH[j] < 0: pairs.append((j, i)); break
 
-# ---------- 数字输出 ----------
+# ---------- numeric output ----------
 L = []
 L.append(f"Mean images: age 60–64 n={yng.sum()}, age >=80 n={old.sum()}; KSAA Q1 n={(Q == 0).sum()} (mean KSAA {gap[Q == 0].mean():.2f}, mean age {age[Q == 0].mean():.1f}), Q4 n={(Q == 3).sum()} (mean KSAA {gap[Q == 3].mean():.2f}, mean age {age[Q == 3].mean():.1f})")
 L.append(f"Pixelwise r between age-difference and age-standardised KSAA-difference maps: {r_map:.3f} (95th percentile of |r| when KSAA is permuted within 5-year age bands: {r_null:.3f}; {NB} permutations)")
@@ -119,9 +119,9 @@ with open(os.path.join(SUM, "saliency_regions.csv"), "w", newline="") as fh:
     w = csv.writer(fh); w.writerow(["region", "area_share", "saliency_share", "enrichment", "enr_lo", "enr_hi", "occl_dMAE", "dMAE_lo", "dMAE_hi", "occl_shift", "shift_lo", "shift_hi", "diff_age", "diff_ksaa"])
     for g in range(6): w.writerow([REG[g], f"{ar[:, g].mean():.4f}", f"{sh[:, g].mean():.4f}", f"{enr[g]:.3f}", f"{enr_ci[0, g]:.3f}", f"{enr_ci[1, g]:.3f}", f"{dmae[g]:.3f}", f"{dmae_ci[0, g]:.3f}", f"{dmae_ci[1, g]:.3f}", f"{sft[g]:.3f}", f"{sft_ci[0, g]:.3f}", f"{sft_ci[1, g]:.3f}", f"{reg_mean(DA)[g]:.5f}", f"{reg_mean(DK)[g]:.5f}"])
 
-# ---------- 默认版式:成对示例 ----------
+# ---------- default layout: paired examples ----------
 CM = LinearSegmentedColormap.from_list("sal", ["#000000", "#5b1a8a", "#d1335b", "#f8961e", "#fff3a0"])
-if A.layout == "examples":   # 2 行 × 3 列,每列一对(上 = 年轻外观,下 = 衰老外观),宽 160 mm
+if A.layout == "examples":   # 2 rows x 3 columns, one pair per column (top = younger-appearing, bottom = older-appearing), 160 mm wide
     WF, SF, GX, GY, XL, YT = 160.0, 47.0, 3.0, 9.0, 9.0, 8.0; HF = YT + 2 * SF + GY + 2.0
     fig = plt.figure(figsize=(WF / 25.4, HF / 25.4))
     for k, (j, i) in enumerate(pairs):
@@ -141,11 +141,11 @@ if A.layout == "examples":   # 2 行 × 3 列,每列一对(上 = 年轻外观,�
     for ext in ("png", "pdf"): fig.savefig(os.path.join(FIGD, f"gradcam_examples.{ext}"), dpi=300)
     print("figure written (examples only)"); sys.exit(0)
 
-# ---------- --layout full 六格版(180 × 146 mm,毫米坐标定位) ----------
+# ---------- --layout full six-panel version (180 x 146 mm, positioned in mm) ----------
 CM = LinearSegmentedColormap.from_list("sal", ["#000000", "#5b1a8a", "#d1335b", "#f8961e", "#fff3a0"])
 WF, HF = 180.0, 146.0
 fig = plt.figure(figsize=(WF / 25.4, HF / 25.4))
-def axmm(x, y, w, h): return fig.add_axes([x / WF, 1 - (y + h) / HF, w / WF, h / HF])      # (x, y) = 左上角,自页面左上起算
+def axmm(x, y, w, h): return fig.add_axes([x / WF, 1 - (y + h) / HF, w / WF, h / HF])      # (x, y) = top-left corner, measured from the page's top-left
 def letter(x, y, t): fig.text(x / WF, 1 - y / HF, t, fontsize=9, fontweight="bold", va="top", ha="left", color=INK)
 def title(ax, t): ax.set_title(t, fontsize=6.5, color=INK, pad=2, linespacing=1.1)
 def bare(ax):
@@ -174,13 +174,13 @@ cax = axmm(XS[2] + 3, YB + SZ + 3.2, SZ - 6, 1.6); cb = fig.colorbar(im, cax=cax
 cb.ax.tick_params(labelsize=5.5, width=0.3, length=1.5, pad=1); cb.ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, _: mi(f"{x:.2f}")))
 cb.set_label("Difference in normalised intensity\n(red, brighter in older knees)", fontsize=5.5, color=INK, labelpad=1.5, linespacing=1.1)
 fig.text((XS[0] + XS[1] + SZ) / 2 / WF, 1 - (YB + SZ + 3.5) / HF, mi(f"Pixelwise correlation of the two difference maps: r = {r_map:.2f}"), fontsize=6, color=INK, ha="center", va="top")
-# C 平均 Grad-CAM
+# C mean Grad-CAM
 XR = 116.0; letter(XR - 4, 1.5, "C")
 ax = axmm(XR + 12, YA, 40, 40); overlay(ax, I.mean(0), MCAM, np.percentile(MCAM, 99.5)); sides(ax)
 for jl in (jm - 8 - 0.5, jm + 8 + 0.5): ax.axhline(jl, color="white", lw=0.4, ls=(0, (2, 2)))
 ax.axvline(R / 2 - 0.5, color="white", lw=0.4, ls=(0, (2, 2))); title(ax, f"Mean Grad-CAM, internal validation set\n(n = {n_ho})")
 for t_, y_ in [("Femur", (jm - 8) / 2), ("Joint band", jm), ("Tibia", (jm + 8 + R) / 2)]: ax.text(-2, y_, t_, fontsize=5.5, color=INK, ha="right", va="center")
-# D 富集比、E 遮挡
+# D enrichment ratios, E occlusion
 lab = ["Femur, lateral", "Femur, medial", "Joint band, lateral", "Joint band, medial", "Tibia, lateral", "Tibia, medial"]; yy = np.arange(6)[::-1]
 YD, HD, WD = 66.0, 27.0, 18.0; XD = XR + 17
 def dots(ax, est, lo, hi, ref, col, xl, t_):
@@ -194,7 +194,7 @@ axd = axmm(XD, YD, WD, HD); dots(axd, enr, enr_ci[0], enr_ci[1], 1, "#2a78d6", "
 axd.set_yticklabels(lab, fontsize=5.5); letter(XR - 4, YD - 7, "D")
 axe = axmm(XD + WD + 6, YD, WD, HD); dots(axe, dmae, dmae_ci[0], dmae_ci[1], 0, "#eb6834", "Increase in MAE\nwhen blurred (years)", "Occlusion")
 letter(XD + WD + 2, YD - 7, "E")
-# F 示例对
+# F example pairs
 YF = 112.0; SF, GP, GQ = 26.5, 1.2, 4.8; letter(1, YF - 10, "F")
 vx = [X0 + k * (2 * SF + GP + GQ) + m * (SF + GP) for k in range(3) for m in range(2)]
 for k, (j, i) in enumerate(pairs):

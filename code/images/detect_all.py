@@ -1,18 +1,18 @@
-"""对全部 4,908 张跑检测器,输出框坐标 + 质量分类。
+"""Run the detector on all 4,908 films and write box coordinates and a quality category.
 
-框以"占整片比例"存储,与降采样倍数无关,后面可直接映射回原始 TIFF。
-分类同 QC:恰好一左一右且水平并排 = 正常;其余进待审名单。
+Boxes are stored as fractions of the whole film, independent of downsampling, so they map directly back to the original TIFF.
+Categories as in QC: exactly one right and one left knee side by side = ok; everything else goes to the review list.
 """
 import os, glob, csv, numpy as np
 from ultralytics import YOLO
 SRC = "/home/data/knee_yolo"
 
 paths = sorted(glob.glob(f"{SRC}/images/*.png"))
-print(f"待检测 {len(paths)} 张", flush=True)
+print(f"{len(paths)} films to detect", flush=True)
 m = YOLO(f"{SRC}/runs/det_v1/weights/best.pt")
 
 fb = open(f"{SRC}/boxes.csv","w",newline=""); wb = csv.writer(fb)
-wb.writerow(["stem","side","cx","cy","w","h","conf"])          # 均为归一化坐标
+wb.writerow(["stem","side","cx","cy","w","h","conf"])          # all normalized coordinates
 fq = open(f"{SRC}/qc.csv","w",newline=""); wq = csv.writer(fq)
 wq.writerow(["stem","status","n_R","n_L","dy_norm"])
 
@@ -46,7 +46,7 @@ for i in range(0, len(paths), 8):
 fb.close(); fq.close()
 
 N = sum(cat.values())
-print(f"\n=== {N} 张 ===")
+print(f"\n=== {N} films ===")
 for k,v in sorted(cat.items(), key=lambda x:-x[1]):
     print(f"  {k:<9} {v:>5}  ({v/N:6.2%})")
-print(f"\nboxes.csv 写入 {cat.get('ok',0)*2} 个框")
+print(f"\nboxes.csv written: {cat.get('ok',0)*2} boxes")

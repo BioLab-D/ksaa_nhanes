@@ -1,8 +1,8 @@
-# 角部遮挡检验:Grad-CAM 在图像上方两角有富集,检验模型预测是否依赖角部。
-#   与 saliency.py --occlude 相同的 5 个全数据模型、预处理、高斯模糊(σ = 16 像素 @448)与集成权重,只换遮挡区域;只用内部验证集 487 人。
-#   条件(两膝同时,64 × 64 像素 = 112 网格的 16 × 16):无遮挡;四个角各自;上方两角;四角;对照 = 左右边缘中部两块(面积同上方两角)。
-#   输出 results/analysis/saliency/occlusion_corners_heldout.csv 与 corner_occlusion_summary.txt(MAE 变化、平均偏移的参与者层面 bootstrap 95% CI)。
-# 跑法(仓库根目录下):python code/interpretability/corner_occlusion.py --bs 8
+# Corner occlusion test: Grad-CAM is enriched in the two top image corners; test whether the predictions depend on the corners.
+#   Same 5 full-data models, preprocessing, Gaussian blur (sigma = 16 px @448) and ensemble weights as saliency.py --occlude, only the occluded regions differ; internal validation set (487) only.
+#   Conditions (both knees, 64 x 64 px = 16 x 16 on the 112 grid): none; each corner; both top corners; all four corners; control = two mid-edge patches left and right (same area as both top corners).
+#   Output results/analysis/saliency/occlusion_corners_heldout.csv and corner_occlusion_summary.txt (change in MAE and mean shift, participant-level bootstrap 95% CI).
+# Run (from the repository root): python code/interpretability/corner_occlusion.py --bs 8
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -10,7 +10,7 @@ from saliency_common import OUT, MODELS, SNAP, S, roi_file, pre
 sys.path.insert(0, SNAP)
 import torch, torch.nn.functional as F, torchvision.models as tvm
 import torchvision.transforms.functional as TF
-for _a in ["resnet18", "resnet50", "efficientnet_b0", "convnext_tiny", "densenet121"]:   # 权重来自存档,不下载 ImageNet 权重
+for _a in ["resnet18", "resnet50", "efficientnet_b0", "convnext_tiny", "densenet121"]:   # weights come from the checkpoints; do not download ImageNet weights
     _f = getattr(tvm, _a); setattr(tvm, _a, (lambda f: (lambda *a, **k: f(weights=None)))(_f)); tvm.__dict__[_a] = getattr(tvm, _a)
 from mammo_age_model import Mammo_AGE
 
@@ -21,7 +21,7 @@ rows = list(csv.DictReader(open(os.path.join(OUT, "ksaa_for_saliency.csv"))))
 HO = set(open(os.path.join(OUT, "heldout_seqn.txt")).read().split()); rows = [r for r in rows if r["SEQN"] in HO]
 if A.n: rows = rows[:A.n]
 
-K = S // 7                                                           # 64 像素
+K = S // 7                                                           # 64 pixels
 def box(r0, c0): m = torch.zeros(S, S, dtype=torch.bool); m[r0:r0 + K, c0:c0 + K] = True; return m
 TL, TR, BL, BR = box(0, 0), box(0, S - K), box(S - K, 0), box(S - K, S - K)
 ML, MR = box(S // 2 - K // 2, 0), box(S // 2 - K // 2, S - K)
@@ -38,7 +38,7 @@ W = {k: v / sum(wts.values()) for k, v in wts.items()}
 print(f"{len(rows)} participants, device {DEV}, ensemble weights", {k: round(v, 3) for k, v in W.items()}, flush=True)
 
 def variants(r):
-    u = torch.stack([pre(roi_file(r["SEQN"], sd), sd) for sd in "LR"]).float().to(DEV)     # [2,S,S],L 已镜像;float32(CPU 上 float64 的 97 × 97 模糊极慢)
+    u = torch.stack([pre(roi_file(r["SEQN"], sd), sd) for sd in "LR"]).float().to(DEV)     # [2,S,S], L already mirrored; float32 (a 97 x 97 blur in float64 is very slow on CPU)
     bl = TF.gaussian_blur(u[:, None], kernel_size=97, sigma=16.0)[:, 0]
     return torch.stack([u if M is None else torch.where(M.to(DEV), bl, u) for M in COND.values()])  # [NV,2,S,S]
 
@@ -53,7 +53,7 @@ for b0 in range(0, N, A.bs):
             p = torch.stack([(F.softmax(l, -1) * AR).sum(-1) for l in loc], 1).mean(1).cpu().numpy()
         P[k][b0:b0 + len(batch)] = p.reshape(len(batch), NV)
     if (b0 // A.bs) % 10 == 0 or b0 < 3: print(f"{b0 + len(batch)}/{N}  {time.time() - t0:.0f}s", flush=True)
-E = sum(P[k] * W[k] for k in ARCH)                                                         # [N,NV] 集成预测年龄
+E = sum(P[k] * W[k] for k in ARCH)                                                         # [N,NV] ensemble predicted age
 age = np.array([float(r["age"]) for r in rows])
 
 with open(os.path.join(OUT, "occlusion_corners_heldout.csv"), "w", newline="") as fh:

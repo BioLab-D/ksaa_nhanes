@@ -1,9 +1,9 @@
-# 解释性分析 · 第 2 步:用 5 个全数据最终模型对预测年龄做 Grad-CAM(只作可视化;KSAA 仍是交叉拟合 OOF 值)。
-#   预处理同 model/knee_v2.py(pct 归一化、左膝镜像、双线性缩放到 448、存档 mu/sd 标准化);读出 = 两膝局部头期望年龄均值,确定性前向。
-#   Grad-CAM 取各骨干最后一个特征图,每膝归一化为和为 1,5 个骨干按内部验证 MAE 倒数加权平均,存 112 × 112。
-#   --occlude:6 个解剖区逐一高斯模糊(σ = 16 像素 @448)后重新预测;模糊比常数填充少引入人为边缘。
-# 全数据模型在训练过的人身上几乎记住了年龄,故正式结果只用 --heldout(487 人,未参与训练)。
-# 跑法(仓库根目录下):python code/interpretability/saliency.py --heldout --bs 8 [--occlude];结果写到 results/analysis/saliency/。
+# Interpretability step 2: Grad-CAM of predicted age with the 5 final full-data models (visualization only; KSAA remains the cross-fitted OOF value).
+#   Preprocessing as in model/knee_v2.py (pct normalization, left-knee mirroring, bilinear resize to 448, saved mu/sd standardization); readout = mean expected age of the two knees' local heads, deterministic forward pass.
+#   Grad-CAM uses each backbone's last feature map, normalized to sum to 1 per knee, averaged over the 5 backbones weighted by inverse internal-validation MAE, saved at 112 x 112.
+#   --occlude: re-predict after Gaussian blurring each of the 6 anatomical regions in turn (sigma = 16 px @448); blurring introduces fewer artificial edges than constant fill.
+# The full-data models nearly memorize age in their training participants, so reported results use only --heldout (487 participants not used for training).
+# Run (from the repository root): python code/interpretability/saliency.py --heldout --bs 8 [--occlude]; results go to results/analysis/saliency/.
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -11,13 +11,13 @@ from saliency_common import OUT, MODELS, SNAP, S, R, REG, roi_file, pre, pool, r
 sys.path.insert(0, SNAP)
 import torch, torch.nn.functional as F, torchvision.models as tvm
 import torchvision.transforms.functional as TF
-for _a in ["resnet18", "resnet50", "efficientnet_b0", "convnext_tiny", "densenet121"]:   # 权重来自存档,不下载 ImageNet 权重
+for _a in ["resnet18", "resnet50", "efficientnet_b0", "convnext_tiny", "densenet121"]:   # weights come from the checkpoints; do not download ImageNet weights
     _f = getattr(tvm, _a); setattr(tvm, _a, (lambda f: (lambda *a, **k: f(weights=None)))(_f)); tvm.__dict__[_a] = getattr(tvm, _a)
 from mammo_age_model import Mammo_AGE
 
 ap = argparse.ArgumentParser(); ap.add_argument("--n", type=int, default=0); ap.add_argument("--bs", type=int, default=4)
-ap.add_argument("--heldout", action="store_true", help="只算全数据模型的内部验证集(487 人;5 个模型相同,未参与训练)")
-ap.add_argument("--occlude", action="store_true", help="区域遮挡检验(只前向)"); A = ap.parse_args()
+ap.add_argument("--heldout", action="store_true", help="only the full-data models' internal validation set (487 participants; same for all 5 models, not used for training)")
+ap.add_argument("--occlude", action="store_true", help="region occlusion test (forward passes only)"); A = ap.parse_args()
 DEV = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 ARCH = {"resnet18": "resnet18", "resnet50": "resnet50", "efficientnetb0": "efficientnet_b0", "convnexttiny": "convnext_tiny", "densenet121": "densenet121"}
 rows = list(csv.DictReader(open(os.path.join(OUT, "ksaa_for_saliency.csv"))))
@@ -25,7 +25,7 @@ if A.heldout:
     HO = set(open(os.path.join(OUT, "heldout_seqn.txt")).read().split()); rows = [r for r in rows if r["SEQN"] in HO]
 if A.n: rows = rows[:A.n]
 print(f"{len(rows)} participants, device {DEV}", flush=True)
-UNIT = {}                                                          # SEQN → [2,S,S] 单位灰度(L 已镜像)
+UNIT = {}                                                          # SEQN -> [2,S,S] unit gray (L already mirrored)
 def unit(r):
     if r["SEQN"] not in UNIT: UNIT[r["SEQN"]] = torch.stack([pre(roi_file(r["SEQN"], sd), sd) for sd in "LR"])
     return UNIT[r["SEQN"]]
@@ -35,28 +35,28 @@ for k, arch in ARCH.items():
     ck = torch.load(os.path.join(MODELS, f"m5_full_{k}_full.pt"), map_location="cpu", weights_only=False)
     a = ck["args"]; assert a["norm"] == "pct" and a["fusion"] == "tf" and a["views"] == "both" and not a["no_mirror"] and ck["views"] == ["L", "R"] and ck["min_age"] == 0 and ck["OFF"] == 0.0
     m = Mammo_AGE(arch=arch, num_output=a["num_output"], nblock=a["nblock"], hidden_size=a["hidden"]); m.load_state_dict(ck["state_dict"], strict=True)
-    dev = "cpu" if k == "convnexttiny" and DEV == "mps" and not A.occlude else DEV   # ConvNeXt 反向传播在 MPS 上报错,改用 CPU
+    dev = "cpu" if k == "convnexttiny" and DEV == "mps" and not A.occlude else DEV   # ConvNeXt backward fails on MPS; use CPU
     m.eval().to(dev); models[k] = (m, ck["par"], dev); wts[k] = 1.0 / ck["inner_val_mae"]
 W = {k: v / sum(wts.values()) for k, v in wts.items()}; print("ensemble weights", {k: round(v, 3) for k, v in W.items()}, flush=True)
 def run(m, par, dev, batch):
     AR = torch.arange(100, dtype=torch.float32, device=dev)
     feats = []
     x = ((torch.stack([unit(r) for r in batch]) - par["mu"]) / par["sd"])[:, :, None].float().to(dev)   # [B,2,1,S,S]
-    def _hook(mod, i, o):                                              # 不返回值(返回值会替换该层输出)
+    def _hook(mod, i, o):                                              # return nothing (a return value would replace the layer output)
         o.retain_grad(); feats.append(o)
     h = m.backbone_model.model.register_forward_hook(_hook)
     g, loc, *_ = m(x, use_sto=False); h.remove()
-    ages = torch.stack([(F.softmax(l, -1) * AR).sum(-1) for l in loc], 1)   # [B,2] 两膝期望年龄
+    ages = torch.stack([(F.softmax(l, -1) * AR).sum(-1) for l in loc], 1)   # [B,2] expected age of each knee
     pred = ages.mean(1); m.zero_grad(); pred.sum().backward()
     cams = []
-    for A_ in feats:                                                   # 两个视图各一次骨干前向:L、R
+    for A_ in feats:                                                   # one backbone forward per view: L, R
         w_ = A_.grad.mean((2, 3), keepdim=True); c = F.relu((w_ * A_).sum(1, keepdim=True))
         c = F.interpolate(c, size=(S, S), mode="bilinear", align_corners=False)[:, 0]
         c = c / c.sum((1, 2), keepdim=True).clamp_min(1e-12); cams.append(c.detach())
     return pred.detach().cpu().numpy(), torch.stack(cams, 1).cpu()     # [B], [B,2,S,S]
 
 def occ_inputs(batch):
-    """每人 7 个变体(0 = 不遮挡,1–6 = REG 各区模糊),[B*7,2,S,S] 单位灰度;区域按每膝自己的关节线划分。"""
+    """7 variants per participant (0 = no occlusion, 1-6 = each REG region blurred), [B*7,2,S,S] unit gray; regions follow each knee's own joint line."""
     out = []
     for r in batch:
         u = unit(r); M = [torch.from_numpy(regions(pool(u[v]).numpy())[0]).repeat_interleave(S // R, 1).repeat_interleave(S // R, 2).to(DEV) for v in range(2)]   # [6,S,S]
