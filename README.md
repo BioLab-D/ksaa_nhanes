@@ -20,7 +20,6 @@
    - [5.3 Applying the Models to New Radiographs](#53-applying-the-models-to-new-radiographs)
 6. [Interpretability](#6-interpretability)
 7. [Data and Licenses](#7-data-and-licenses)
-8. [Citation and Contact](#8-citation-and-contact)
 
 ## 1. Introduction
 
@@ -182,12 +181,3 @@ All inputs derive from public-use files of the National Center for Health Statis
 - NHANES data are in the public domain.
 
 Many code comments are in Chinese.
-
-## 8. Citation and Contact
-
-```
-Sheng C, Zhang Y, Li X, Chen K. Deep learning–estimated skeletal age acceleration from knee radiographs
-and long-term mortality in older US adults: a cohort study. [Journal, year, DOI — to be added]
-```
-
-Contact: Xiangchun Li (lixiangchun@tmu.edu.cn) and Kexin Chen (chenkexin@tmu.edu.cn), Tianjin Medical University Cancer Institute and Hospital.
