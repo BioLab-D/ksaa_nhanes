@@ -19,7 +19,6 @@
    - [5.2 Training](#52-training)
    - [5.3 Applying the Models to New Radiographs](#53-applying-the-models-to-new-radiographs)
 6. [Interpretability](#6-interpretability)
-7. [Data and Licenses](#7-data-and-licenses)
 
 ## 1. Introduction
 
@@ -170,12 +169,3 @@ python code/interpretability/corner_occlusion.py     # corner occlusion test in 
 ```
 
 Grad-CAM maps and region occlusion tests are also included ([`code/interpretability/README.md`](code/interpretability/README.md)).
-
-## 7. Data and Licenses
-
-All inputs derive from public-use files of the National Center for Health Statistics (NCHS): the NHANES III (1988–1994) household adult, examination and laboratory files, the NHANES III knee radiographs, and the NCHS 2019 public-use Linked Mortality File. Users must follow the NCHS data-use restrictions, including that no attempt be made to identify any participant. [`data/README.md`](data/README.md) describes every shipped file.
-
-- Code written for this study: [license to be added].
-- `code/model/mammo_age_model.py`, `transformer.py`, `probordiloss.py`, `mean_variance_loss.py` and `metrics.py` are from the official Mammo-AGE implementation (Apache License 2.0, `code/model/LICENSE_Mammo-AGE`). In `mammo_age_model.py` and `transformer.py` the number of views (`N_VIEWS`; 2 knees instead of 4 mammographic views), the global dropout rate (`DROP`) and the import path were changed; the other three files are unchanged.
-- Knee detection uses Ultralytics YOLO11 (AGPL-3.0) as an installed dependency; no Ultralytics code or detector weights are included.
-- NHANES data are in the public domain.
