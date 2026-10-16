@@ -1,6 +1,8 @@
-# Interpretability step 1 (no model): bilateral knee images of the 4,875 participants, preprocessed as in training and pooled to 112 x 112, for mean and difference maps;
-#   also writes heldout_seqn.txt (internal validation set shared by the 5 full-data models, not used for training). Input ksaa_for_saliency.csv comes from saliency_input.R.
-# Run (from the repository root): python code/interpretability/saliency_images.py
+# Preprocessed knee images of the 4,875 participants pooled to 112 x 112, for mean and difference maps (no model is run).
+#   Also writes heldout_seqn.txt, the internal validation set shared by the 5 full-data models (not used for training).
+# Input: results/analysis/saliency/ksaa_for_saliency.csv (saliency_input.R), ROI images, checkpoints in models/
+# Output: img_all.npy, img_all_seqn.txt, heldout_seqn.txt in results/analysis/saliency/
+# Run: python code/interpretability/saliency_images.py
 import os, sys, csv, time, numpy as np, torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from saliency_common import OUT, MODELS, R, roi_file, pre, pool

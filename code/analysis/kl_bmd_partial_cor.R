@@ -1,11 +1,8 @@
-# Expert radiographic reading features and proximal femur DXA (partial r used in Section 3.4): partial correlation with KSAA, and each feature's own HR for all-cause mortality (Model 3).
-#   Reading features: K–L, osteophytes, sclerosis, chondrocalcinosis, joint replacement, radiographic OA, knee pain; sample = complete phase 2 reading (K–L, osteophytes, sclerosis) and complete Model 3 covariates.
-#   Partial correlation = correlation of residuals after regressing each on Model 3 covariates (point-biserial for binary), CI by Fisher z (SE = 1/√(n − 3 − k), k = number of covariate columns);
-#   continuous features per SD (standardized within that feature's sample), binary as present vs absent; Wald P, Bonferroni over the 5 reading features (FEATP).
-#   Features: sum of the 4 compartments per knee, worse of the two knees; 8/9 set to missing; knee pain as pain (HAG22) in analysis_data.
-# Input results/analysis/analysis_data.rds, results/work/xray_components.csv
-# Output results/analysis/kl_dxa_partial_cor.csv
-# Run by run_all.sh
+# Partial correlations of KSAA with radiographic reading features (K-L grade, osteophytes, sclerosis, chondrocalcinosis, joint
+# replacement, radiographic OA, knee pain) and proximal femur DXA, plus each feature's own Model 3 HR for all-cause mortality.
+# Partial r = correlation of residuals after regressing both on Model 3 covariates; CI by Fisher z with SE = 1/sqrt(n - 3 - k).
+# Reading features: sum of the 4 compartments, worse knee; codes 8/9 missing. Bonferroni over the 5 reading features (FEATP).
+# Input: results/analysis/analysis_data.rds, results/work/xray_components.csv. Output: results/analysis/kl_dxa_partial_cor.csv
 suppressMessages(library(survival))
 res <- here::here("results"); v3 <- file.path(res, "analysis"); spw <- file.path(res, "work")
 d <- readRDS(file.path(v3, "analysis_data.rds")); SDG <- sd(d$gap); d$z <- d$gap / SDG
@@ -22,12 +19,12 @@ M3V <- c("age", "sex", "race", "edu3", "smk3", "alc3", "pa3", "bmi", "htn", "dm"
 COV <- "age + factor(sex) + factor(race) + edu3 + smk3 + alc3 + pa3 + bmi + htn + dm + tc + hdl + egfr + cvd_hist + cancer_hist"
 stopifnot(all(M3V %in% names(d)))
 s <- d[!is.na(d$kl) & !is.na(d$osteo) & !is.na(d$scler) & complete.cases(d[, M3V]), ]
-stopifnot(all(s$kl == s$klmax))   # agrees with klmax in analysis_data
+stopifnot(all(s$kl == s$klmax))
 cat(sprintf("Sample: complete phase 2 reading and Model 3 covariates n = %d, deaths %d\n", nrow(s), sum(s$e)))
 FEAT <- c(kl = "K–L grade", osteo = "Osteophyte score", scler = "Subchondral sclerosis score", chondro = "Chondrocalcinosis",
           tka = "Joint replacement", roa = "Radiographic osteoarthritis (K–L ≥2)", pain = "Knee pain")
 BIN <- c("chondro", "tka", "roa", "pain")
-# Bonferroni counts only the five reading features (FEATP); radiographic OA (binary K–L) and knee pain are not counted.
+# radiographic OA (binary K-L) and knee pain are not counted in the Bonferroni correction
 FEATP <- c("kl", "osteo", "scler", "chondro", "tka")
 pcor <- function(v, t) { k <- ncol(model.matrix(as.formula(paste("~", COV)), t)) - 1
   r <- cor(resid(lm(as.formula(paste(v, "~", COV)), t)), resid(lm(as.formula(paste("z ~", COV)), t))); se <- 1 / sqrt(nrow(t) - 3 - k)
@@ -45,8 +42,8 @@ R <- rbind(R, data.frame(key = "ksaa", feature = "KSAA (per SD)", binary = FALSE
 rownames(R) <- NULL
 print(format(R[, -1], digits = 3))
 
-# ---- DXA block: femoral neck BMD, total hip BMD, total hip bone mineral content and bone area (low BMD reflects less mineral, not smaller bone) ----
-#   all-8 sentinels set to missing by q(); total hip BMD = BDPTOBMC / BDPTOARE. Sample = all four non-missing and complete Model 3 covariates (both phases).
+# ---- DXA: femoral neck BMD, total hip BMD, total hip bone mineral content and bone area ----
+# q() sets the all-8 codes to missing; total hip BMD = BDPTOBMC / BDPTOARE. Sample: all four measures and Model 3 covariates present.
 DX <- read.csv(file.path(spw, "dxa_all.csv"))
 q <- function(x) { x <- suppressWarnings(as.numeric(x))
   for (k in 1:6) { s8 <- as.numeric(strrep("8", k)); lo <- x[!is.na(x) & x < s8]

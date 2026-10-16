@@ -1,12 +1,10 @@
-"""Screen the full sample for metal implants.
+"""Scan all ROIs for metal implants.
 
-Motivation: visual review of the low-confidence rescued films showed many total knee replacements/screws/plates. If metal
-is concentrated in the rescued group, excluding them would systematically remove joint-replacement patients
-- a group related both to severe OA and to access to surgery (health care access), i.e. not missing at random.
+Review of the rescued films showed many knee replacements, screws and plates. Excluding these films would remove
+participants with severe OA who had access to surgery, so the scan checks whether metal is concentrated among them.
 
-Criterion: metal forms a saturated plateau on radiographs, whereas the brightest bone is only scattered pixels. Hence
-frac_top = fraction of pixels >= 0.995*max in the image. It is tiny for normal knees (isolated peaks),
-while metal forms contiguous high values. No threshold is preset; it is chosen after looking at both distributions.
+Metal forms a saturated plateau, whereas the brightest bone gives only scattered pixels. The statistic is
+frac_top, the fraction of pixels >= 0.995 x the image maximum; no threshold is fixed in advance.
 """
 import os, re, csv, glob, numpy as np
 from multiprocessing import Pool

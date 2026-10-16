@@ -1,6 +1,6 @@
 # Radiograph processing
 
-These scripts ran on a Linux GPU server with the data under `/home/data/` (paths are hard-coded at the top of each script; edit them for your system). They are not needed to reproduce the statistical analyses, whose image-derived inputs are shipped in `data/images/` and `data/predictions/`.
+These scripts ran on a Linux GPU server with the data under `/home/data/` (paths are hard-coded at the top of each script, and `pipeline.sh` calls the Python scripts from `/tmp`; edit them for your system). They are not needed to reproduce the statistical analyses, whose image-derived inputs are shipped in `data/images/` and `data/predictions/`.
 
 Order of execution:
 

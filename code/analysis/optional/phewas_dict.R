@@ -1,10 +1,10 @@
-# Per-variable code dictionary for the three NHANES III public files (adult / exam / lab), used by phewas_clean.R to handle missing codes.
-# Missing codes (6/7/8/9-fill) are written as 88, 888, 8888... by field width and stored as numbers, but 88 is a valid value for ALP/MCV;
-#   so each code, its label and frequency are read per variable from the official codebook (*-acc.pdf), and missing codes are identified from labels, not by guessing numbers.
-# Sources: raw_data/nhanes3/{adult,exam,lab}.sas (field positions, widths, SAS labels) and docs/{adult,exam,lab}-acc.pdf (index sections + codes + frequencies).
-# Check: codebook frequencies compared with per-code counts in the full DuckDB tables (ewas_dict_check.csv); mismatching variables are excluded from the EWAS.
-# Output results/analysis/phewas/: ewas_codes.csv (long: one row per variable and code), ewas_vars.csv (one row per variable), ewas_dict_check.csv
-# Run (from the repository root; needs pdftotext and the raw layout files under data/raw/): Rscript code/analysis/optional/phewas_dict.R
+# Code dictionary of the NHANES III adult, exam and lab files, used by phewas_clean.R to recognise missing codes.
+#   Fill codes (88, 888, ...) depend on field width and can be valid values (e.g. 88 for ALP or MCV), so each variable's
+#   codes, labels and frequencies are read from the codebook PDFs and missing codes are identified by label.
+#   Codebook frequencies are checked against counts in DuckDB; variables that do not match are excluded.
+# Input: data/raw/nhanes3/{adult,exam,lab}.sas, data/raw/nhanes3/docs/{adult,exam,lab}-acc.pdf (not shipped; needs pdftotext)
+# Output: results/analysis/phewas/ewas_codes.csv (one row per variable and code), ewas_vars.csv, ewas_dict_check.csv
+# Run from the repository root: Rscript code/analysis/optional/phewas_dict.R
 suppressMessages({library(DBI); library(duckdb)})
 raw <- here::here("data", "raw", "nhanes3"); out <- here::here("results", "analysis", "phewas")
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
@@ -32,7 +32,8 @@ pdf_txt <- function(f) {
 }
 
 # ---------- 3. Index: variable -> section / subsection ----------
-# index lines look like "Doctor ever told you had: arthritis .........   HAC1A              1465"; sections start in column 0, subsections are indented (both all caps without leader dots)
+# index lines look like "Doctor ever told you had: arthritis .........   HAC1A              1465"; section headings are
+#   all caps without leader dots, in column 0 (sections) or indented (subsections)
 read_index <- function(L, sas) {
   hdr <- grepl("^\\s*[A-Z][A-Z0-9 ,/()&:;.'+-]{3,}$", L) & !grepl("\\.{3,}|NHANES III|^\\s*(NOTES|CODE|TOPIC)\\b|\\.\\s*$|[a-z]", L)
   cur_top <- NA; cur_sub <- NA; res <- list()
@@ -50,15 +51,14 @@ read_index <- function(L, sas) {
 }
 
 # ---------- 4. Body: code lines of each variable ----------
-# variable block: position line ("    1423-1426    Lead (ug/dL)") -> name line ("  PBP   2342   00.7 Below level of detection"; the name may be in column 0
-#   or carry only a label continuation) -> code lines ("   24476   0001-71.8"). A name line counts only right after a position line whose start matches SAS, which excludes notes and the index.
+# variable block: position line ("    1423-1426    Lead (ug/dL)"), name line ("  PBP   2342   00.7 Below level of detection"),
+#   then code lines ("   24476   0001-71.8"). A name line counts only after a position line matching the SAS layout.
 read_body <- function(L, sas) {
   pos <- setNames(sas$start, sas$variable); en <- setNames(sas$end, sas$variable)
   nre <- "^\\s{0,8}([A-Z][A-Z0-9]{1,9})(\\s+(.*))?$"; cre <- "^\\s+([0-9]+)\\s+(\\S.*?)\\s*$"
   prev_nonempty <- function(k) { j <- k - 1; while (j > 0 && !nzchar(trimws(L[j]))) j <- j - 1; j }
   is_pos <- function(s, v) { m <- regmatches(s, regexec("^\\s*([0-9]+)(-([0-9]+))?(\\s{2,}.*)?$", s))[[1]]
     length(m) > 0 && as.integer(m[2]) == pos[[v]] && (if (nzchar(m[4])) as.integer(m[4]) == en[[v]] else pos[[v]] == en[[v]]) }
-  # first locate all valid name lines
   starts <- integer(); vars <- character()
   for (k in seq_along(L)) {
     m <- regmatches(L[k], regexec(nre, L[k]))[[1]]
@@ -122,7 +122,7 @@ for (f in names(FILES)) {
   ty <- dbGetQuery(con, sprintf("select column_name as vname, column_type from (describe %s)", FILES[[f]])); names(ty)[1] <- "variable"
   v <- merge(sas, idx, by = "variable", all.x = TRUE); v <- merge(v, ty, by = "variable", all.x = TRUE)
 
-  # --- check: codebook frequency of each single-value code vs DuckDB count; Blank frequency vs NULL count; sum of all frequencies vs row count
+  # --- check single-code frequencies, Blank vs NULL counts and total frequency against DuckDB
   num <- v$variable[v$column_type %in% c("DOUBLE", "INTEGER", "TINYINT", "BIGINT", "SMALLINT") & v$variable %in% body$variable]
   chk <- lapply(num, function(x) {
     b <- body[body$variable == x, ]

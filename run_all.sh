@@ -7,7 +7,6 @@
 # Each step writes its console output to results/logs/<step>.txt.
 set -euo pipefail
 cd "$(dirname "$0")"
-export V2=1                     # knee_age_standard.R / agemodel_std.R / tableS1_performance.R: final five-backbone models
 CLARITE_PY=${CLARITE_PY:-python3}
 LOG=results/logs; mkdir -p $LOG
 
@@ -33,7 +32,7 @@ STEPS=(
   weighted weighted_boot    # survey-weighted primary analyses (design on all adult examinees, cohort as a domain) -> results/analysis/weighted/
   phewas_audit_counts phewas_audit phewas phewas_table
   fig2_mortality joint_quartiles fig3_incremental fig1 fig4 figS1_biascorr
-  kl_bmd_partial_cor        # partial correlations of KSAA with the K-L grade and proximal femur BMD (Section 3.4)
+  kl_bmd_partial_cor        # partial correlations of KSAA with the K-L grade and proximal femur BMD
   manuscript_tables tableS1_performance manuscript_numbers
   verify_derived            # compare the regenerated results with data/derived/ (stops with an error on any difference)
 )
@@ -43,7 +42,7 @@ step() {
     stage)               stage_inputs ;;
     survival_labels)     run survival_labels ;;
     ksaa_ensemble)       run ksaa_ensemble; cp $LOG/ksaa_ensemble.txt results/ksaa_ensemble_log.txt ;;   # tableS1_performance.R cross-checks this log
-    phewas_audit_counts) run phewas_clean EWAS_STAGE=audit; mv $LOG/phewas_clean.txt $LOG/phewas_audit_counts.txt ;;   # per-variable counts for the audit + cleaned phenotypes
+    phewas_audit_counts) run phewas_clean; mv $LOG/phewas_clean.txt $LOG/phewas_audit_counts.txt ;;   # per-variable counts for the audit + cleaned phenotypes
     fig4)                run fig4_phewas                                                         # Figure 4: panel B and data in R, panel A and assembly with CLARITE
                          $CLARITE_PY code/analysis/fig4_phewas_clarite.py . > $LOG/fig4_clarite.txt 2>&1 || { echo "FAILED: Figure 4A (see $LOG/fig4_clarite.txt)"; exit 1; } ;;
     *)                   run $1 ;;

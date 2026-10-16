@@ -1,21 +1,16 @@
-# Table S1: age-prediction performance of the five pre-specified backbones and their weighted ensemble; plus performance by subgroup (reference only, not in the manuscript).
-# Output results/tableS1_performance.xlsx (sheets named Table 2 / Table S2) and results/work/{t2,s2}_en*.csv.
-# All models share one participant-level fold split (sorted SEQN strings, random.seed(20260831), i %% 5; verified 4,872/4,872).
+# Table S1: age-prediction performance (mean +/- SD over folds) of the five backbones and the ensemble; also by subgroup (not reported).
+# Input: results/ksaa_oof.csv, results/predictions/m4_*_oof.csv, results/ksaa_ensemble_log.txt (cross-check)
+# Output: results/tableS1_performance.xlsx (sheets keep the draft names "Table 2" / "Table S2"), results/work/tableS1*_en.csv
 res <- here::here("results")
 sp  <- here::here("results", "work")
 suppressMessages(library(openxlsx))
 B <- read.csv(file.path(res,"ksaa_oof.csv")); age <- B$age; fold <- B$fold; K <- 0:4
 sl <- read.csv(file.path(res, "work", "surv_labels.csv")); ii <- match(B$SEQN, sl$SEQN); B$sex <- sl$sex[ii]; B$race <- sl$race[ii]; B$phase <- sl$phase[ii]
 al <- function(f){ x <- read.csv(f); v <- x$pred_age[match(B$SEQN, x$SEQN)]; stopifnot(!anyNA(v)); v }
-V2 <- Sys.getenv("V2","0")=="1"   # V2=1 reads the knee-adapted version in results/predictions/ (4,875 participants)
-MV <- file.path(res,"mammo_mv")
-mv <- function(a, lr=FALSE) al(file.path(MV, sprintf("off_448%s_%s_oof.csv", if(lr) "lr" else "", a)))
 v2 <- function(a) al(file.path(res, "predictions", sprintf("m4_%s_oof.csv", a)))
-M <- if(V2) list(
+M <- list(
   list(l="ResNet-18", p=v2("resnet18")), list(l="ResNet-50", p=v2("resnet50")), list(l="EfficientNet-B0", p=v2("efficientnetb0")),
-  list(l="ConvNeXt-Tiny", p=v2("convnexttiny")), list(l="DenseNet-121", p=v2("densenet121"))) else list(
-  list(l="ResNet-18", p=mv("resnet18")), list(l="ResNet-50", p=mv("resnet50")), list(l="EfficientNet-B0", p=mv("efficientnet_b0")),
-  list(l="ConvNeXt-Tiny", p=mv("convnext_tiny", lr=TRUE)), list(l="DenseNet-121", p=mv("densenet121")))
+  list(l="ConvNeXt-Tiny", p=v2("convnexttiny")), list(l="DenseNet-121", p=v2("densenet121")))
 M <- c(M, list(
   list(l="Weighted ensemble{a}", p=B$pred_raw, bold=TRUE),
   list(l="Weighted ensemble, bias-corrected{b}", p=B$pred_corr, bold=TRUE)))
@@ -27,7 +22,7 @@ met <- function(p){ m <- sapply(K, function(k){ j <- fold==k; e <- p[j]-age[j]; 
 T2 <- do.call(rbind, lapply(M, function(x) if(!is.null(x$g)) data.frame(lab=x$g, mae="", cs="", r="", rs="", type="hdr", bold=FALSE)
                                            else { v <- met(x$p); data.frame(lab=x$l, mae=v[1], cs=v[2], r=v[3], rs=v[4], type="row", bold=isTRUE(x$bold)) }))
 chk <- T2[T2$type=="row", c("lab","mae")]
-# check values are read from ksaa_ensemble_log.txt, not hard-coded
+# cross-check the ensemble MAE against ksaa_ensemble_log.txt
 kas <- readLines(file.path(res,"ksaa_ensemble_log.txt")); ref <- function(lab) sub("^.*MAE ([0-9.]+ ± [0-9.]+).*$", "\\1", grep(lab, kas, value=TRUE, fixed=TRUE)[1])
 cat(sprintf("Check (should equal ksaa_ensemble_log.txt: raw %s / corrected %s):\n", ref("Ensemble (raw)"), ref("Ensemble (bias-corrected)"))); print(tail(chk, 7), row.names=FALSE)
 stopifnot(tail(chk$mae,1)==ref("Ensemble (bias-corrected)"), chk$mae[nrow(chk)-1]==ref("Ensemble (raw)"))
@@ -56,7 +51,7 @@ S2_notes <- c(
 names_s2 <- c("Subgroup","n","MAE, uncorrected, years","Mean error, uncorrected, years","KSAA, mean (SD), years")
 write.csv(T2, file.path(sp,"tableS1_en.csv"), row.names=FALSE, fileEncoding="UTF-8"); write.csv(S2, file.path(sp,"tableS1_subgroups_en.csv"), row.names=FALSE, fileEncoding="UTF-8")
 writeLines(T2_notes, file.path(sp,"tableS1_notes.txt"), useBytes=TRUE); writeLines(S2_notes, file.path(sp,"tableS1_subgroups_notes.txt"), useBytes=TRUE)
-# ---- workbook (same journal style as Table 1) ----
+# ---- workbook ----
 wb <- createWorkbook(); modifyBaseFont(wb, fontSize=10, fontName="Times New Roman")
 sheet <- function(name, title, out, hdr_rows, ind_rows, bold_rows, widths, notes){
   addWorksheet(wb, name, gridLines=FALSE); nc <- ncol(out); last <- nrow(out)+3

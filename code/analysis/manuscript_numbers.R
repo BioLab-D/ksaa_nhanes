@@ -1,6 +1,8 @@
-# Numbers needed by the manuscript that downstream scripts do not print directly (ksaa_oof.csv, 4,875 participants):
-#  1 follow-up summary; 2 continuous and median-split KSAA x Models 1–3 (n/deaths/ΔC, quartiles and log-rank); 3 C increment over the PhenoAge model;
-#  4 effect modification by race and poverty (log HRs compared across stratified fits, no product terms); 5 trivial-baseline MAE and relative reduction by the raw ensemble
+# In-text numbers not printed by other scripts (4,875 participants in ksaa_oof.csv):
+# 1, follow-up; 2, KSAA (continuous and median split) in Models 1-3 with quartiles and log-rank test; 3, C increment over PhenoAge;
+# 4, effect modification by race and poverty (stratified fits, no product terms); 5, MAE of a trivial baseline vs the raw ensemble.
+# Input: results/ksaa_oof.csv, results/work/{surv_labels.csv,validate_vars.csv,oof_pheno.rds}
+# Output: console (results/logs/manuscript_numbers.txt)
 suppressMessages(library(survival))
 res <- here::here("results"); sp <- file.path(res,"work")
 d <- read.csv(file.path(res,"ksaa_oof.csv")); sl <- read.csv(file.path(res, "work", "surv_labels.csv")); i <- match(d$SEQN, sl$SEQN)

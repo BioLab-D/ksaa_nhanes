@@ -1,7 +1,7 @@
-# Parts of the weighted primary analyses that need replicate weights: Figure 2 standardized absolute risks and curves, discrimination for Figure 3B and Table S6 (Harrell C, R²_D)
-# Replicate weights: Rao–Wu rescaling bootstrap (survey::as.svrepdesign, type = "subbootstrap") on the design of all examinees, then the study sample's rows are taken;
-#   every model is refitted with each replicate's weights and 95% CIs are percentiles. Point estimates use the original weights. Phase 2 (K–L) uses replicate weights from the phase 2 design.
-# Run by run_all.sh
+# Weighted analyses that need replicate weights: Figure 2 standardized risks and curves; Figure 3B and Table S6 discrimination (Harrell C, R²_D).
+# Rao–Wu rescaling bootstrap (as.svrepdesign, type = "subbootstrap") on the design of all examinees, then restricted to the cohort; each model is
+# refitted with every replicate's weights and 95% CIs are percentiles. Phase 2 (K–L) analyses use replicates of the phase 2 design.
+# Output: results/analysis/weighted/{figure2_*,figure3b_cindex,tableS6}.csv
 source(here::here("code", "analysis", "weighted_common.R"))
 suppressMessages(library(parallel)); NC <- max(1, detectCores() - 1)
 set.seed(20260929); R_RISK <- 500; R_C <- 200
@@ -11,7 +11,7 @@ RW2 <- weights(as.svrepdesign(D2, type = "subbootstrap", replicates = R_C), type
 # ---------------- Figure 2: standardized cumulative incidence (g-formula; weights enter the Cox fit and the population average) ----------------
 co <- F[F$inc, ]; wco <- co$W6; rco <- RW6[F$inc, ]
 stdrisk <- function(dat, w, grid) {
-  k <- w > 0; dat <- dat[k, ]; w <- w[k]; dat$w <- w   # rows with replicate weight 0 (PSU not drawn) are excluded from the fit and the population average
+  k <- w > 0; dat <- dat[k, ]; w <- w[k]; dat$w <- w   # drop rows with replicate weight 0 (PSU not drawn)
   step_at <- function(bh, g) { i <- findInterval(g, bh$time); c(0, bh$hazard)[i + 1] }
   cs <- function(ev) coxph(as.formula(sprintf("Surv(t, cause == '%s') ~ q + age + factor(sex)", ev)), dat, weights = w)
   FIT <- list(all = coxph(Surv(t, e) ~ q + age + factor(sex), dat, weights = w), cvd = cs("cvd"), cancer = cs("cancer"), other = cs("other"))
@@ -49,7 +49,7 @@ KAP <- sqrt(8 / pi)
 wC <- function(tt, ee, lp, w) concordance(Surv(tt, ee) ~ lp, weights = w, reverse = TRUE)$concordance
 wR2 <- function(tt, ee, lp, w) { o <- order(lp); cw <- cumsum(w[o]); p <- numeric(length(lp)); p[o] <- (cw - w[o] / 2) / sum(w)
   s <- qnorm(p) / KAP; D <- coef(coxph(Surv(tt, ee) ~ s, weights = w)); r <- unname(D / KAP)^2; r / (pi^2 / 6 + r) }
-# check of the implementation: unweighted, it matches R.D from survival::royston
+# without weights this matches R.D from survival::royston
 sp <- F$inc & !is.na(F$pa_accel); s0 <- F[sp, ]; m0 <- coxph(Surv(t, e) ~ age + factor(sex) + pa_accel, s0)
 cat(sprintf("\nSelf-check: unweighted R²_D this implementation %.4f, royston %.4f; C this implementation %.4f, concordance %.4f\n", wR2(s0$t, s0$e, predict(m0), rep(1, nrow(s0))), royston(m0)[["R.D"]],
   wC(s0$t, s0$e, predict(m0), rep(1, nrow(s0))), concordance(m0)$concordance))
@@ -78,7 +78,7 @@ sb <- F$cc & !is.na(F$pa_accel); x <- F[sb, ]; rb <- RW6[sb, 1:R_C]
 st <- function(dat, w, base, add) { dat$w <- w; coxph(as.formula(sprintf("Surv(t, e) ~ %s + %s", base, add)), dat, weights = w) }
 pt1 <- disc(x, x$W6, "e", M3, "pa_accel"); bs1 <- simplify2array(mclapply(seq_len(R_C), function(b) disc(x, rb[, b], "e", M3, "pa_accel"), mc.cores = NC))
 pt2 <- disc(x, x$W6, "e", paste(M3, "+ pa_accel"), "gap"); bs2 <- simplify2array(mclapply(seq_len(R_C), function(b) disc(x, rb[, b], "e", paste(M3, "+ pa_accel"), "gap"), mc.cores = NC))
-pw <- function(des, rhs, term) { m <- svycoxph(as.formula(paste("Surv(t, e) ~", rhs)), design = des); regTermTest(m, as.formula(paste("~", term)), df = Inf)$p }   # chi-square reference (consistent with the CIs): the phase 2 design has only 23 degrees of freedom, leaving about 1 denominator df for an F test
+pw <- function(des, rhs, term) { m <- svycoxph(as.formula(paste("Surv(t, e) ~", rhs)), design = des); regTermTest(m, as.formula(paste("~", term)), df = Inf)$p }   # chi-square reference, as for the CIs: the phase 2 design has 23 df, leaving ~1 denominator df for an F test
 S6 <- rbind(S6, cbind(summ(pt1, bs1, "Beyond PhenoAge: + Phenotypic Age acceleration"), n = nrow(x), events = sum(x$e), p_wald = pw(dom6(sb), paste(M3, "+ pa_accel"), "pa_accel")),
                cbind(summ(pt2, bs2, "Beyond PhenoAge: + KSAA"), n = nrow(x), events = sum(x$e), p_wald = pw(dom6(sb), paste(M3, "+ pa_accel + gap"), "gap")))
 s2 <- F2$cc & F2$phase_all == 2 & !is.na(F2$klmax); y <- F2[s2, ]; r2 <- RW2[s2, 1:R_C]

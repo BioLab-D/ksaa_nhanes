@@ -1,11 +1,8 @@
-"""Crop high-resolution knee ROIs from the original 16-bit TIFFs using the detection boxes.
+"""Crop knee ROIs from the original 16-bit TIFFs using the detection boxes.
 
-ROIs are saved as 16-bit rather than windowed 8-bit: re-cropping means re-reading all 4,908 38-MB TIFFs
-(about 1 hour), and the disk has 2.9 TB free. Keeping the full dynamic range leaves the choice of window,
-which is tuned repeatedly downstream, to training time instead of fixing it in preprocessing.
-
-The box is enlarged 1.15 × to keep some anatomical context; areas beyond the film edge are edge-padded rather than zero-padded
-to avoid artificial strong gradients at the ROI border.
+ROIs are kept at 16 bits so that the grey-level window can be chosen at training time rather than fixed here.
+The box is enlarged 1.15 x for anatomical context; regions beyond the film edge are edge-padded, not zero-padded,
+to avoid artificial edges at the ROI border.
 """
 import os, csv, numpy as np
 from multiprocessing import Pool

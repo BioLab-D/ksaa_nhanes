@@ -1,12 +1,14 @@
-# PheWAS: survey-weighted phenome-wide scan following the audit table (phewas_audit.R), direction KSAA -> phenotype.
-# Models: one per phenotype; exposure = KSAA per SD (full-cohort SD); covariates fixed as age, sex, race/ethnicity, education (edu3) and PIR (not selected by univariable significance).
-#   continuous -> svyglm Gaussian (log-transformed then standardized if skewed); binary -> quasibinomial (OR); ordinal >= 3 levels -> svyolr (sparse levels < 30 merged into neighbours); nominal -> reverse joint test, P only.
-#   Design: WTPFEX6 + SDPPSU6/SDPSTRA6 (nest); fasting-subsample variables use WTPFSD6; reproductive-history items restricted to women, not adjusted for sex; subsets always via subset(design).
-# Replication: phase 1 / phase 2 each fitted with the phase design (WTPFEXn + SDPPSUn/SDPSTRAn); "replicated" = same direction in both phases, each P < 0.05.
-#   P and CI from the t distribution with design df (49 for the 6-year design, 23 for phase designs); the 6-year design is not split by phase (1 PSU left per stratum).
-# Multiple testing: BH-FDR, Bonferroni and the Li-Ji effective number of tests within the main, supplementary and extended-module sets separately.
-# Input results/analysis/{analysis_data.rds, fxf_vars.csv, ewas/ewas_clean.rds, ewas/ewas_audit_table.csv, ewas/ewas_multilevel_plan.csv}
-# Output results/analysis/phewas/phewas_results.csv, phewas_y.rds, phewas_summary.txt
+# PheWAS: survey-weighted scan of the phenotypes in the audit table (phewas_audit.R), KSAA -> phenotype.
+# One model per phenotype: KSAA per SD + age, sex, race/ethnicity, education and PIR. Continuous: svyglm Gaussian
+#   (log-transformed if skewed, then standardized); binary: quasibinomial; ordinal: svyolr (levels < 30 merged into a
+#   neighbour); nominal: reverse joint test, P only.
+# Design: WTPFEX6, SDPPSU6, SDPSTRA6; fasting-subsample measures use WTPFSD6; reproductive items in women only.
+#   Subsets always via subset(design). P and CI use t with design df (49; 23 for a single phase).
+# Replication: each phase fitted with its own design; replicated = same direction and P < 0.05 in both phases.
+# Multiple testing: BH-FDR, Bonferroni and Li-Ji, separately for main, supplementary and extended-module sets.
+# Input: results/analysis/{analysis_data.rds, fxf_vars.csv}, results/analysis/phewas/{ewas_clean.rds, ewas_audit_table.csv,
+#   ewas_multilevel_plan.csv}
+# Output: results/analysis/phewas/phewas_results.csv, phewas_y.rds, phewas_summary.txt
 suppressMessages({library(survey); library(MASS); library(DBI); library(duckdb)})
 options(survey.lonely.psu = "adjust")
 res <- here::here("results"); out <- file.path(res, "analysis"); ew <- file.path(out, "phewas")
@@ -24,7 +26,7 @@ SDG <- sd(d$gap); d$z <- d$gap / SDG
 d$sex <- factor(d$sex); d$race <- factor(d$race); d$edu3 <- factor(d$edu3)
 COV <- c("age", "sex", "race", "edu3", "pir")
 mkdes <- function(w, psu, str, rows) svydesign(id = as.formula(paste0("~", psu)), strata = as.formula(paste0("~", str)), weights = as.formula(paste0("~", w)), nest = TRUE, data = d[rows, ])
-# designs: 6-year design, phase designs, fasting-subsample weights; rows align y
+# designs: 6-year, phase 1, phase 2, fasting subsample; rows aligned with y
 DS <- list(all = list(des = mkdes("WTPFEX6", "SDPPSU6", "SDPSTRA6", TRUE), rows = rep(TRUE, nrow(d))),
            p1 = list(des = mkdes("WTPFEX1", "SDPPSU1", "SDPSTRA1", d$phase == 1), rows = d$phase == 1),
            p2 = list(des = mkdes("WTPFEX2", "SDPPSU2", "SDPSTRA2", d$phase == 2), rows = d$phase == 2),
@@ -46,7 +48,7 @@ for (nm in names(COMP)) { it <- COMP[[nm]]; stopifnot(all(it$items %in% A$variab
   A <- rbind(A[!(A$variable %in% it$items), ], r) }
 
 # ---------- Summaries of other repeated measures / multi-item tests, defined as in Table S10 ----------
-# new phenotypes pass the same thresholds: continuous >= 500 and >= 5 distinct values; binary >= 500 and >= 100 per class; ordinal >= 500.
+# derived phenotypes must pass: continuous n >= 500 and >= 5 values; binary n >= 500 and >= 100 per class; ordinal n >= 500
 gate <- function(y, type) { y <- y[!is.na(y)]; if (type == "continuous") length(y) >= 500 && length(unique(y)) >= 5
   else if (length(unique(y)) == 2) length(y) >= 500 && min(table(y)) >= 100 else length(y) >= 500 }
 add_pheno <- function(nm, y, type, label, tmpl, cls, src, note, labs = character()) {
@@ -59,7 +61,7 @@ add_pheno <- function(nm, y, type, label, tmpl, cls, src, note, labs = character
   A <<- rbind(A[!(A$variable %in% src), ], r) }
 xv <- function(v) CL$x[[v]]
 lev_is <- function(v, re) { ll <- CL$labs[[v]][as.character(CL$x[[v]])]; ifelse(is.na(CL$x[[v]]), NA, as.numeric(grepl(re, ll, ignore.case = TRUE))) }
-# repeated measures: gait speed from the faster of two trials (= Table S10 gait, checked value by value), mean steps, mean of home and examination pulse
+# repeated measures: gait speed from the faster trial (asserted equal to the Table S10 variable), mean steps, mean pulse
 sp <- 2.4384 / suppressWarnings(pmin(xv("PFPTWLKA"), xv("PFPTWLKB"), na.rm = TRUE)); sp[!is.finite(sp)] <- NA
 stopifnot(identical(is.na(sp), is.na(d$gait)), max(abs(sp - d$gait), na.rm = TRUE) < 1e-9)
 add_pheno("PFP_gait_speed", sp, "continuous", "Gait speed (faster of two 8-ft walks, m/s)", "PFPTWLKA", "function", c("PFPTWLKA", "PFPTWLKB"),
@@ -69,8 +71,8 @@ add_pheno("PFP_steps_8ft_mean", mn2(xv("PFPNSTPA"), xv("PFPNSTPB")), "continuous
           c("PFPNSTPA", "PFPNSTPB"), "v1.2: repeated trials summarised (mean)")
 add_pheno("pulse_mean", mn2(xv("HAZA5R"), xv("PEP6DR")), "continuous", "Pulse rate (mean of household and examination readings)", "HAZA5R", "objective",
           c("HAZA5R", "PEP6DR"), "v1.2: repeated measurement summarised (mean of household and MEC readings, as for blood pressure)")
-# serial subtraction, 5 items -> number correct (answers 17/14/11/8/5): 55 "can't do" and 99 "don't know" scored wrong, 88 and blank missing; score missing if any item is missing.
-#   the cleaned table sets 55/99 to missing, so raw codes are read from duckdb.
+# serial subtraction, 5 items -> number correct (17/14/11/8/5): 55 "can't do" and 99 "don't know" count as wrong, 88 and
+#   blank as missing; the score is missing if any item is. Raw codes are read from DuckDB because cleaning drops 55/99.
 con <- dbConnect(duckdb(), here::here("data", "nhanes3", "nhanes3_knee_cohort.duckdb"), read_only = TRUE); dbWriteTable(con, "coh", data.frame(SEQN = d$SEQN), temporary = TRUE)
 H18 <- dbGetQuery(con, "select SEQN, HAP18A, HAP18B, HAP18C, HAP18D, HAP18E from nhanes3_adult join coh using (SEQN)"); dbDisconnect(con, shutdown = TRUE)
 H18 <- H18[match(d$SEQN, H18$SEQN), ]; KEY <- c(HAP18A = 17, HAP18B = 14, HAP18C = 11, HAP18D = 8, HAP18E = 5)
@@ -84,9 +86,8 @@ add_pheno("HAP17_word_registration", sc3(c("HAP17A1", "HAP17A2", "HAP17A3")), "c
           c("HAP17A1", "HAP17A2", "HAP17A3"), "v1.2: 3 items summed (as for story recall); ordinal (fewer than 5 values)", L03)
 add_pheno("HAP19_word_recall", sc3(c("HAP19A", "HAP19B", "HAP19C")), "categorical", "Three-word recall (words correct, 0-3)", "HAP19A", "objective",
           c("HAP19A", "HAP19B", "HAP19C"), "v1.2: 3 items summed (as for story recall); ordinal (fewer than 5 values)", L03)
-# recoded in place to match the Table S10 definitions (each variable appears once in the scan):
-#   difficulty items (HAH1-HAH12, PEP13E1A-E5A) -> any difficulty (including unable) vs none; falls HAG14 -> >= 1 in the past 12 months;
-#   tandem stand PFPTTAND -> unable to hold 10 s (including those not attempting); fracture items unchanged. New codes checked value by value against the Table S10 derived variables.
+# binary recodes matching Table S10 (asserted against the Table S10 variables): difficulty items HAH1-12 and PEP13E1A-E5A
+#   -> any difficulty vs none; HAG14 -> >= 1 fall in 12 months; PFPTTAND -> tandem stand < 10 s.
 FXV <- read.csv(file.path(out, "fxf_vars.csv")); FXV <- FXV[match(d$SEQN, FXV$SEQN), ]
 cmp <- function(a, b) { k <- !is.na(a) & !is.na(b); stopifnot(all(a[k] == b[k])); invisible(TRUE) }
 recode_bin <- function(v, y, lab0, lab1, note) { stopifnot(v %in% A$variable, length(y) == nrow(d))
@@ -104,7 +105,7 @@ cmp(FXV$tand_fail, as.numeric(xv("PFPTTAND") < 10))
 recode_bin("PFPTTAND", FXV$tand_fail, "No", "Yes", "v1.2: unable to hold the tandem stand for 10 s, as in Table S8")
 cat(sprintf("Audit table v1.2: main-analysis phenotypes %d (supplementary %d; extended module %d)\n", sum(A$status == "main"), sum(A$status == "supplementary"), sum(A$status == "exposure_module")))
 
-# ---------- Per-variable type and recoding (rules pre-specified; reasons written with the results) ----------
+# ---------- Outcome type and recoding per variable ----------
 NA3 <- c(HAF2 = "Never walks uphill or hurries", HAL14D = "Doesn't work", HAL17 = "Never received allergy shots")   # third level = not applicable -> missing; binary
 ORDMAP <- list(HAK4 = c(`3` = 0, `1` = 1, `2` = 2),          # never < 1-2 < 3+ times
                PFPSCOOT = c(`2` = 0, `1` = 1, `3` = 2))      # no < yes(uses arms) < unable
@@ -167,12 +168,12 @@ for (i in seq_len(nrow(A))) {
   v <- A$variable[i]; r <- A[i, ]; pr <- prep(v, r)
   women <- r$health_class == "reproductive_exposure"
   keep <- !is.na(pr$y) & complete.cases(d[, COV]) & (!women | d$sex == "2")
-# fasting subsample (union of two rules): (1) glucose / insulin / C-peptide of the glucose-tolerance group (not HbA1c), not fasting values outside the morning session, so restricted to the morning subsample with its weight;
-#   (2) variables measured only in the morning subsample (e.g. LDL, LCP).
+# fasting-subsample measures (WTPFSD6): glucose, insulin and C-peptide (fasting only in the morning session; not HbA1c)
+#   and variables measured only in the morning subsample (LDL)
   fast <- (grepl("DIABETES TESTING", r$section) && v != "GHP") || (sum(keep) >= 50 && mean(d$WTPFSD6[keep] > 0) > 0.95)
   cov <- if (women) setdiff(COV, "sex") else COV
   a1 <- run(if (fast) "fp1" else "p1", pr$y, pr$model, keep, cov); a2 <- run(if (fast) "fp2" else "p2", pr$y, pr$model, keep, cov)
-# items collected in one phase only: main analysis uses that phase's design (its weight + PSU/strata); decided from valid sample sizes in the two phases only.
+# items collected in one phase only (judged from valid n per phase) use that phase's design
   key <- if (a1$n >= 50 && a2$n < 50) (if (fast) "fp1" else "p1") else if (a2$n >= 50 && a1$n < 50) (if (fast) "fp2" else "p2") else (if (fast) "fall" else "all")
   single <- key != (if (fast) "fall" else "all")
   a <- run(key, pr$y, pr$model, keep, cov)
@@ -202,7 +203,7 @@ liji <- function(M) { M <- M[, colSums(!is.na(M)) > 0, drop = FALSE]; C <- suppr
   ev <- eigen(C, symmetric = TRUE, only.values = TRUE)$values; ev[ev < 0] <- 0; sum(as.numeric(ev >= 1) + (ev - floor(ev))) }
 for (s in unique(R$set)) { k <- R$set == s & !is.na(R$p); R$fdr[k] <- p.adjust(R$p[k], "BH"); R$bonf[k] <- p.adjust(R$p[k], "bonferroni")
   vs <- R$variable[k & R$variable %in% names(YN)]; M <- do.call(cbind, YN[vs]); me <- liji(M); R$meff[k] <- me; R$p_liji[k] <- pmin(1, R$p[k] * me) }
-# independent signals: main-analysis FDR < 5% merged greedily in order of P (|r| > 0.7 with a selected signal joins its cluster; r from cleaned numeric values, pairwise complete)
+# independent signals: main-analysis FDR < 5% hits clumped in order of P at |r| > 0.7 (pairwise-complete r)
 k <- which(R$set == "main" & !is.na(R$fdr) & R$fdr < 0.05 & R$variable %in% names(YN)); k <- k[order(R$p[k])]
 R$clump_lead <- NA_character_; leads <- character()
 for (i in k) { v <- R$variable[i]; hit <- NA

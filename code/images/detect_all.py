@@ -1,7 +1,7 @@
-"""Run the detector on all 4,908 films and write box coordinates and a quality category.
+"""Run the knee detector on all 4,908 films and write box coordinates and a quality category.
 
-Boxes are stored as fractions of the whole film, independent of downsampling, so they map directly back to the original TIFF.
-Categories as in QC: exactly one right and one left knee side by side = ok; everything else goes to the review list.
+Boxes are stored as fractions of the film size, so they map directly onto the original TIFF.
+A film is "ok" when exactly one right and one left knee are detected side by side; all others go to the review list.
 """
 import os, glob, csv, numpy as np
 from ultralytics import YOLO
@@ -12,7 +12,7 @@ print(f"{len(paths)} films to detect", flush=True)
 m = YOLO(f"{SRC}/runs/det_v1/weights/best.pt")
 
 fb = open(f"{SRC}/boxes.csv","w",newline=""); wb = csv.writer(fb)
-wb.writerow(["stem","side","cx","cy","w","h","conf"])          # all normalized coordinates
+wb.writerow(["stem","side","cx","cy","w","h","conf"])          # coordinates as fractions of film size
 fq = open(f"{SRC}/qc.csv","w",newline=""); wq = csv.writer(fq)
 wq.writerow(["stem","status","n_R","n_L","dy_norm"])
 

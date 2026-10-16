@@ -1,13 +1,12 @@
-"""Bootstrap a YOLO knee detection data set with heuristics.
+"""Build a bootstrap training set for the YOLO knee detector from heuristic boxes.
 
-Input = whole bilateral knee film (downsampled to 1024); output = 2 boxes (class 0 = participant's right knee / 1 = left knee).
-Boxes come from the v4 joint localization logic: joint-row localization was correct in 24/24 checked films, so it serves as a candidate;
-ROI extent is the weak point of the heuristic and is what manual review plus model training are meant to fix.
+Input: whole bilateral knee film (downsampled to 1024 px); output: two boxes (class 0 = participant's right knee,
+1 = left knee). The joint row is located from the intensity profile (correct in 24 of 24 films checked); box size is less
+reliable, which is what review and detector training are meant to correct.
 
-A suspicion score is also written to put the films most likely mislabelled at the front of the review queue:
-  - weak detrended dip -> joint localization unreliable
-  - large difference between left and right joint rows -> at least one side is wrong (joint heights should be similar on standing films)
-  - fibula-based laterality conflicts with the default "left half = right knee" -> the film may be mirrored
+A suspicion score orders the films for review:
+  - weak joint-space dip in the detrended profile (joint row unreliable)
+  - large difference between the left and right joint rows (at least one side wrong)
 """
 import os, sys, glob, random, csv, numpy as np
 from multiprocessing import Pool
@@ -18,7 +17,7 @@ DIR = "/home/data/knee_xray"
 OUT = "/home/data/knee_yolo"
 SAT = 63000
 LONG = 1024
-# robust range of box width (fraction of film width), from the distribution in 300 films (median 0.185); knee width is nearly constant under the standardized protocol, so clamping loses no signal
+# plausible box width as a fraction of film width (300 films, median 0.185); knee width varies little under the standard protocol
 W_LO, W_HI, W_MED = 0.15, 0.23, 0.185
 
 def _box(x, k):
@@ -26,7 +25,6 @@ def _box(x, k):
     return np.convolve(np.pad(x, pad, mode="edge"), np.ones(k)/k, mode="valid")
 
 def _longest_run(on, fallback):
-    # best must start from a zero span, otherwise the update condition is never true
     best, cur, s = (0, 0), 0, 0
     for i, v in enumerate(on):
         if v:
@@ -37,7 +35,7 @@ def _longest_run(on, fallback):
     return best if best[1] > best[0] else (0, fallback)
 
 def limb_cols(h):
-    # mean localization + SD gating: bright film-edge bands have high column means but near-zero SD, so drop them by SD first, then find the longest run by mean
+    # limb columns: high column mean and non-trivial SD (bright film-edge bands have a high mean but near-zero SD)
     m = np.where(h >= SAT, 0, h).astype(np.float32)
     band = m[int(.25*m.shape[0]):int(.75*m.shape[0]), :]
     pm, ps = band.mean(axis=0), band.std(axis=0)
@@ -93,13 +91,13 @@ def one(p):
             boxes.append([cls, cc, jr, w*1.16])       # size clamped later
             rows.append(dict(side=side, jr=jr, w=w, strength=strength, fib=fib))
 
-        # centre reliable, size not: use the same width for both knees, clamped to the robust range
+        # same width for both knees, clamped to the plausible range
         bw = float(np.clip(np.mean([b[3] for b in boxes])/W, W_LO, W_HI)) * W
         for b in boxes: b[3] = bw
 
         dj = abs(rows[0]["jr"] - rows[1]["jr"])
         lat_ok = (rows[0]["fib"] == "R" and rows[1]["fib"] == "L")
-        # laterality not scored: left half = participant's right knee (confirmed in review images); the fibula criterion is uninformative
+        # laterality is not scored: the image left is always the participant's right knee (the fibula check lat_ok was uninformative)
         susp = (0.0 if rows[0]["strength"] > .35 else 1.0) + \
                (0.0 if rows[1]["strength"] > .35 else 1.0) + \
                (1.5 if dj > 250 else 0.0)

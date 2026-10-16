@@ -1,7 +1,7 @@
-# Joint stratification: KSAA quartile x comparison measure (PhenoAge acceleration, total hip BMD, K–L) cells, each filled with the HR vs the reference cell (HR rather than OR for survival);
-#   standardized 10-year absolute risks (Cox g-formula) are also written to the CSV. Quartiles (about 280 per cell); K–L collapsed to 0–1 / ≥2 (too few in higher grades).
-#   Cardiovascular and cancer versions use cause-specific Cox (other deaths censored); 1 − S is not a cumulative incidence, so risk is NA.
-# Input results/analysis/analysis_data.rds; output results/analysis/{joint_cells.csv, joint_within.csv}
+# Joint stratification: KSAA quartile x quartile of PhenoAge acceleration or total hip BMD, or K-L 0-1 / >=2 (about 280 per cell).
+# Each cell gets an HR against the reference cell and a standardized 10-year risk (Cox g-formula). Cardiovascular and cancer models
+# are cause-specific (other deaths censored), so 1 - S is not a cumulative incidence and their risk is left NA.
+# Input: results/analysis/analysis_data.rds. Output: results/analysis/{joint_cells,joint_within}.csv
 source(here::here("code", "analysis", "fig_common.R"))
 d <- readRDS(file.path(V3, "analysis_data.rds"))
 TIME <- 120; K <- 4                       # months = 10 years; quartiles
@@ -9,21 +9,21 @@ QL <- paste0("Q", 1:K)
 
 qcut <- function(x, k = K) cut(x, quantile(x, 0:k / k, na.rm = TRUE), include.lowest = TRUE, labels = paste0("Q", 1:k))
 
-# Cox g-formula: set the whole sample to each cell in turn and average predicted survival; 1 - surv is that cell's standardized 10-year mortality risk
+# Cox g-formula: assign everyone to each cell in turn and average predicted survival; 1 - surv is the standardized 10-year risk
 std_cell <- function(dat, adj = "age + factor(sex)", time = TIME, ev = "e") {
   fit <- coxph(as.formula(sprintf("Surv(t, %s) ~ cell + %s", ev, adj)), dat)
   levs <- levels(dat$cell)
   risk <- if (ev != "e") setNames(rep(NA_real_, length(levs)), levs) else sapply(levs, function(l) { nd <- dat; nd$cell <- factor(l, levs)
     1 - rowMeans(summary(survfit(fit, newdata = nd), times = time)$surv) })
   cf <- summary(fit)$coefficients
-  hr <- hl <- hh <- setNames(rep(1, length(levs)), levs)   # all three are 1 in the reference cell, labelled ref in plots
+  hr <- hl <- hh <- setNames(rep(1, length(levs)), levs)   # 1 in the reference cell
   for (l in levs[-1]) { rn <- paste0("cell", l)
     if (rn %in% rownames(cf)) { b <- cf[rn, "coef"]; se <- cf[rn, "se(coef)"]
       hr[l] <- exp(b); hl[l] <- exp(b - 1.96 * se); hh[l] <- exp(b + 1.96 * se) } }
   list(risk = risk, hr = hr, hr_lo = hl, hr_hi = hh)
 }
 
-# y = KSAA quartile, x = comparison measure (oriented so that right is worse); reference cell is Q1 x first level, lowest on both
+# y = KSAA quartile, x = comparison measure oriented so that higher is worse; reference cell = Q1 x first level
 panel_data <- function(dat, xlab_levels, ref_x, tag, ev = "e", ref_y = "Q1") {
   dat <- dat[!is.na(dat$xq) & !is.na(dat$gap), ]
   dat$yq <- qcut(dat$gap)

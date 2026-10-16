@@ -1,8 +1,9 @@
-# Corner occlusion test: Grad-CAM is enriched in the two top image corners; test whether the predictions depend on the corners.
-#   Same 5 full-data models, preprocessing, Gaussian blur (sigma = 16 px @448) and ensemble weights as saliency.py --occlude, only the occluded regions differ; internal validation set (487) only.
-#   Conditions (both knees, 64 x 64 px = 16 x 16 on the 112 grid): none; each corner; both top corners; all four corners; control = two mid-edge patches left and right (same area as both top corners).
-#   Output results/analysis/saliency/occlusion_corners_heldout.csv and corner_occlusion_summary.txt (change in MAE and mean shift, participant-level bootstrap 95% CI).
-# Run (from the repository root): python code/interpretability/corner_occlusion.py --bs 8
+# Corner occlusion test: Grad-CAM weight was concentrated in the two upper image corners, so check whether predictions depend on them.
+#   Same models, preprocessing, blur (sigma 16 px at 448) and ensemble weights as saliency.py --occlude; internal validation set (487).
+#   Conditions (both knees, 64 x 64 px): none; each corner; both upper corners; all four; control = left and right mid-edge patches.
+# Output: results/analysis/saliency/occlusion_corners_heldout.csv, corner_occlusion_summary.txt (change in MAE and mean shift,
+#   participant-level bootstrap 95% CI)
+# Run: python code/interpretability/corner_occlusion.py --bs 1
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

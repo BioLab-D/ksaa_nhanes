@@ -1,8 +1,7 @@
-"""Crop the rescued rotated films.
+"""Crop ROIs of the films rescued by rotation (boxes_rot.csv).
 
-The normalized coordinates in boxes_rot.csv are relative to the **rotated** image, so the original TIFF must first
-be rotated by the same angle before applying them. The rot field is the argument of PIL rotate(),
-and the same call is reused to avoid getting the direction wrong.
+Box coordinates refer to the rotated image, so each TIFF is first rotated with the same PIL rotate() call as in
+rotate_rescue.py (angle in the rot column).
 """
 import os, csv, numpy as np
 from multiprocessing import Pool

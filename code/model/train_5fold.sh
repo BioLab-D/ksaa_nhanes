@@ -1,7 +1,7 @@
 #!/bin/bash
-# Five-fold cross-fitting of the multi-view Mammo-AGE knee age model (N = 4 fusion blocks, 448 ROI); writes per-fold internal validation MAE and OOF predictions.
-# Recipe adapted to knee films: knee augmentation + per-image P0.5–P99.5 float normalization + AdamW with cosine annealing (wd 1e-4).
-# Section 1 is the five backbones used in the manuscript; sections 2 and 3 are ablations not reported in the manuscript. Usage: bash train_5fold.sh
+# Five-fold cross-fitting of the knee age model (4 transformer blocks, 448-px ROIs): per-fold internal-validation MAE and
+# out-of-fold predictions. Knee recipe: knee augmentation, per-image P0.5-P99.5 normalization, AdamW with cosine decay.
+# Section 1 = the five backbones in the manuscript; sections 2 and 3 = ablations not reported. Usage: bash train_5fold.sh
 export TORCH_HOME=/home/data/torch PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True N_VIEWS=2 DROP=0 NO_ALBUMENTATIONS_UPDATE=1
 PY=${PY:-python}; cd /tmp/mammo_age_official; D=${D:-/home/data/knee_yolo/v2}; mkdir -p $D
 F='grep --line-buffered -vE check_version|fetch_version|validated_self|UserWarning|data.=.fetch'
@@ -20,7 +20,7 @@ run(){ t=$1; shift; L=$D/$t.log
 }
 echo "=== Mammo-AGE-style comparison (N=4, five folds) start $(date '+%F %T')  BASE=$BASE ===" > $Q
 
-# ── 1 five backbones (used in the manuscript)
+# 1. five backbones (manuscript)
 echo "$(date '+%F %T')  --- section 1: five backbones ---" >> $Q
 run m4_resnet18       --arch resnet18       --img 448
 run m4_resnet50       --arch resnet50       --img 448
@@ -28,14 +28,14 @@ run m4_efficientnetb0 --arch efficientnet_b0 --img 448
 run m4_convnexttiny   --arch convnext_tiny  --img 448
 run m4_densenet121    --arch densenet121    --img 448
 
-# ── 2 module ablations @ ResNet-18 (not reported in the manuscript)
+# 2. module ablations, ResNet-18 (not reported)
 echo "$(date '+%F %T')  --- section 2: module ablations ---" >> $Q
 run m4_ab_wo_citf --arch resnet18 --img 448 --nblock 0     # w/o CI-Transformer
 run m4_ab_wo_poe  --arch resnet18 --img 448 --no_poe       # w/o POE
 run m4_ab_wo_mvl  --arch resnet18 --img 448 --no_mvl       # w/o MVL
-run m4_ab_wo_mt   --arch resnet18 --img 448 --no_density   # w/o Multi-task (no auxiliary knee labels)
+run m4_ab_wo_mt   --arch resnet18 --img 448 --no_density   # w/o density branch (no auxiliary labels)
 
-# ── 3 input size @ ResNet-18 (not reported in the manuscript; 448 is in section 1)
+# 3. input size, ResNet-18 (not reported; 448 px is in section 1)
 echo "$(date '+%F %T')  --- section 3: input size ---" >> $Q
 run m4_sz112 --arch resnet18 --img 112
 run m4_sz224 --arch resnet18 --img 224

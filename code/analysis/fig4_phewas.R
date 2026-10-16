@@ -1,6 +1,8 @@
-# Figure 4: this script draws B (forest plot) and exports the data for A; fig4_phewas_clarite.py draws A with CLARITE's manhattan plot and combines it with B.
-#   B = top NTOP independent signals (FDR < 5% hits merged at |r| > 0.7, then ordered by P), per SD of KSAA -> phenotype: top block binary/ordinal OR, bottom block continuous SD difference; label numbers = rank, point color = health category
-# Input: results/analysis/phewas/phewas_results.csv; output: figures/Figure4A.csv, Figure4B
+# Figure 4B (forest plot) and the data for 4A; fig4_phewas_clarite.py draws 4A with CLARITE and combines the panels.
+#   B: top NTOP independent signals (FDR < 5% hits clumped at |r| > 0.7, ordered by P), per SD of KSAA; binary/ordinal
+#   phenotypes as OR (top block), continuous as SD difference (bottom block); numbers = rank, colors = health class.
+# Input: results/analysis/phewas/phewas_results.csv
+# Output: results/figures/Figure4A.csv, Figure4B.{png,pdf}
 source(here::here("code", "analysis", "fig_common.R"))
 source(here::here("code", "analysis", "phewas_labels.R"))
 # full figure is 183 mm wide, font size 5.2 pt (as in Figures 2 and 3); B is 3.15 in wide
@@ -46,12 +48,12 @@ short <- function(v, lab) ifelse(v %in% names(SHORT), SHORT[v], nice(v, lab))
 A <- data.frame(variable = R$variable, label = ifelse(R$variable %in% TOP, sprintf("%d  %s", rk[R$variable], short(R$variable, R$phenotype)), short(R$variable, R$phenotype)),
                 category = CLS_NAME[R$health_class], colour = CLS_COL[R$health_class], p = R$p, fdr = R$fdr, replicated = R$replicated, is_top = R$variable %in% TOP)
 write.csv(A, file.path(FIGD, "Figure4A.csv"), row.names = FALSE)
-# ---- b ----
+# ---- B ----
 mrow <- function(v) { r <- R[R$variable == v, ]; data.frame(lab = sprintf("%d  %s", rk[[v]], short(v, r$phenotype)), hdr = FALSE, est = r$est, lo = r$lo, hi = r$hi, txt = ci(r$est, r$lo, r$hi), col = CLS_COL[[r$health_class]]) }
 hrow <- function(lab) data.frame(lab = lab, hdr = TRUE, est = NA, lo = NA, hi = NA, txt = "", col = INK)
 VOR <- TOP[R$model[match(TOP, R$variable)] %in% c("binomial", "ordinal")]; VSD <- TOP[R$model[match(TOP, R$variable)] == "gaussian"]; stopifnot(length(VOR) + length(VSD) == NTOP)
 # within each block of B, order by health domain (= point color), then by P
-ordcls <- function(vs) { i <- match(vs, R$variable)   # domain order matches the legend of A (CLARITE sorts categories alphabetically), not CLS_ORDER
+ordcls <- function(vs) { i <- match(vs, R$variable)   # alphabetical, as in the legend of A (CLARITE's order), not CLS_ORDER
   vs[order(CLS_NAME[R$health_class[i]], R$p[i], method = "radix")] }
 VOR <- ordcls(VOR); VSD <- ordcls(VSD)
 B1 <- rbind(hrow("Binary and ordinal phenotypes"), do.call(rbind, lapply(VOR, mrow))); B1$row <- rev(seq_len(nrow(B1)))

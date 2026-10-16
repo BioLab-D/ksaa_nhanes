@@ -1,7 +1,11 @@
 # Figure 3: incremental prognostic value of KSAA beyond Phenotypic Age acceleration.
-#   A, per-SD HRs with both in the model; B, Harrell's C and R²_D before and after adding KSAA (with relative gains); C–E, HRs in cells cross-classified by the quartiles of both (reference Q1×Q1).
-# n = 4,522 (PhenoAge available). Weights of the combined score are estimated in the same sample, so values are apparent (no optimism correction); CIs of the gains come from the bootstrap, re-estimating the weights in every resample.
-# Input: results/analysis/{phenoage_combined_cindex.csv, phenoage_combined_improvement.csv, phenoage_wald.csv, joint_cells.csv, joint_within.csv}
+#   A, per-SD HRs with both in the model; B, Harrell's C and R²_D before and after adding KSAA, with relative gains;
+#   C-E, HRs in cells cross-classified by the quartiles of both (reference Q1 x Q1).
+# n = 4,522 (PhenoAge available). C and R²_D are apparent values (no optimism correction); CIs from replicate-weight bootstrap.
+# Input: results/analysis/weighted/{figure3a, figure3b_cindex, figure3_cells, figure3_within}.csv
+#   or, with KSAA_UNWEIGHTED=1, results/analysis/{phenoage_combined_cindex, phenoage_combined_improvement, phenoage_wald,
+#   joint_cells, joint_within}.csv
+# Output: results/figures/Figure3.{png,pdf}
 source(here::here("code", "analysis", "fig_common.R"))
 GREEN <- "#2e7d55"   # color of the "gain from adding KSAA" annotation, not a data encoding
 OUT3 <- c("All-cause", "Cardiovascular", "Cancer")
@@ -12,7 +16,7 @@ IMP <- read.csv(file.path(V3, "phenoage_combined_improvement.csv")); IMP$o <- no
 WD <- read.csv(file.path(V3, "phenoage_wald.csv")); WD$o <- norm_out(WD$outcome)
 JC <- read.csv(file.path(V3, "joint_cells.csv")); JC <- JC[JC$panel %in% c("main", "main_cvd", "main_cancer"), ]   # three heat maps: all-cause / cardiovascular / cancer
 JW <- read.csv(file.path(V3, "joint_within.csv")); JW <- JW[JW$panel %in% c("main", "main_cvd"), ]   # per-SD HR of KSAA within each quartile (for the legend and console output)
-# Uses the survey-weighted results by default (results/analysis/weighted/); KSAA_UNWEIGHTED=1 draws the unweighted version. Sample and (unweighted) quartile cut points are the same.
+# survey-weighted results by default; KSAA_UNWEIGHTED=1 draws the unweighted version (same sample and quartile cut points)
 if (Sys.getenv("KSAA_UNWEIGHTED") != "1") { WD_ <- file.path(V3, "weighted")
   OM <- c(allcause = "All-cause mortality", cvd = "CVD mortality", cancer = "Cancer mortality"); PN <- c(allcause = "main", cvd = "main_cvd", cancer = "main_cancer")
   x <- read.csv(file.path(WD_, "figure3a.csv")); x$outcome <- OM[x$outcome]; x$o <- norm_out(x$outcome); WD <- x
@@ -48,7 +52,7 @@ num <- function(x) { r <- round(x); ifelse(r == 0, "0", mi(as.character(r))) }  
 sgn <- function(x) { r <- round(x); ifelse(r == 0, "0", ifelse(r > 0, paste0("+", r), mi(as.character(r)))) }
 pct <- function(est, d) sprintf("%s%%", ifelse(round(est, d) > 0, paste0("+", f2(est, d)), f2(est, d)))
 
-# y-axis upper limit from the data: the annotation area (2% top margin, about 7% per line, plus 3%) must lie entirely above the highest CI limit
+# y-axis upper limit: the annotation area (2% top margin, about 7% per line, plus 3%) must lie above the highest CI limit
 ytop <- function(hi, bot, lines, step) { z <- 0.05 + 0.07 * lines; ceiling(((max(hi) - z * bot) / (1 - z)) / step) * step }
 mkpanel <- function(L, ann, title, ylab, ylim, breaks, ref = NA, ann_y = ylim[2] - 0.02 * diff(ylim)) {   # 2% between the top of the green text and the top border
   lev <- unique(L$series); L$series <- factor(L$series, lev)
@@ -78,11 +82,11 @@ pa <- mkpanel(La, Aa, "A", "Harrell's C (95% CI)", c(0.63, ytop(La$hi, 0.63, 1, 
 Lr <- rbind(data.frame(o = CI7$o, est = CI7$R2_pa, lo = CI7$R2_pa_lo, hi = CI7$R2_pa_hi, series = PA),
             data.frame(o = CI7$o, est = CI7$R2_cb, lo = CI7$R2_cb_lo, hi = CI7$R2_cb_hi, series = PK))
 Ar <- data.frame(o = CI7$o, lab = pct(CI7$relR2, 1))
-pr <- mkpanel(Lr, Ar, "B", "Explained variation, R² (95% CI)", c(0.08, ytop(Lr$hi, 0.08, 1, 0.01)), seq(0.1, 0.4, 0.1))   # no plotmath subscript: cairo_pdf raises a CID font error and writes no PDF; R²_D is defined in the legend
+pr <- mkpanel(Lr, Ar, "B", "Explained variation, R² (95% CI)", c(0.08, ytop(Lr$hi, 0.08, 1, 0.01)), seq(0.1, 0.4, 0.1))   # no plotmath subscript (cairo_pdf fails with a CID font error); R²_D is defined in the legend
 
 # ---- A: per-SD HRs with both in the model, for three outcomes (horizontal forest plot, values on the right) ----
 XLO <- 0.88; XHI <- 1.68; XT <- 1.73; XMAX <- 2.35   # forest area + value column on the right (log axis)
-XBRK <- c(0.9, 1, 1.2, 1.4, 1.6)   # the axis line is capped between the first and last ticks, so the lowest tick must cover the lower CI limit of KSAA for cancer (0.95)
+XBRK <- c(0.9, 1, 1.2, 1.4, 1.6)   # axis line is capped at the outer ticks, so the lowest tick must be below the lowest CI limit (KSAA, cancer: 0.95)
 hrtxt <- function(e, l, h) sprintf("%s (%s\u2013%s)", f2(e, 2), f2(l, 2), f2(h, 2))
 fbase <- function(df, ylim) ggplot(df, aes(hr, y)) +
   annotate("rect", xmin = XT / 1.04, xmax = XMAX, ymin = ylim[1], ymax = ylim[2], fill = "white", colour = NA) +
@@ -107,13 +111,13 @@ pc <- fbase(LA, c(0.45, 3.75)) +
   scale_y_continuous(breaks = 3:1, labels = OUT3, expand = c(0, 0)) +
   labs(title = "A", x = "HR per SD (95% CI)", y = NULL) +
   theme(plot.title = element_text(margin = margin(l = AL, b = 1)),   # shift the letter right to align with letter C in the bottom row
-        axis.title.x = element_text(hjust = log(XHI / XLO) / (2 * log(XMAX / XLO)), margin = margin(t = 3.2)))   # centered on the forest area (the right half is the value column); the top margin aligns it with the axis of B
+        axis.title.x = element_text(hjust = log(XHI / XLO) / (2 * log(XMAX / XLO)), margin = margin(t = 3.2)))   # centered on the forest area; top margin aligns it with the axis title of B
 
 QLV <- paste0("Q", 1:4)
-qhet_p <- function(w) { b <- log(w$hr); se <- (log(w$hi) - log(w$lo)) / (2 * qnorm(.975)); wt <- 1 / se^2   # Cochran Q,df = 3
+qhet_p <- function(w) { b <- log(w$hr); se <- (log(w$hi) - log(w$lo)) / (2 * qnorm(.975)); wt <- 1 / se^2   # Cochran Q, df = 3
   pchisq(sum(wt * (b - sum(wt * b) / sum(wt))^2), length(b) - 1, lower.tail = FALSE) }
-# ---- B: Harrell's C and R²_D of the base model (age + sex + Phenotypic Age acceleration) and with KSAA added; relative gains on the right ----
-#   CIs from 200 bootstrap replicates, refitting both models in the same resample (not differences of the two CI limits).
+# ---- B: Harrell's C and R²_D of the base model (age + sex + PhenoAge acceleration) and with KSAA; relative gains on the right ----
+#   CIs from 200 bootstrap replicates, refitting both models in each replicate.
 MC <- "Harrell\u2019s C"; MR <- "Explained variation, R\u00b2"
 mkb <- function(est, lo, hi, m, ser) data.frame(o = CI7$o, est = est, lo = lo, hi = hi, m = m, s = ser)
 LB2 <- rbind(mkb(CI7$C_pa, CI7$C_pa_lo, CI7$C_pa_hi, MC, PA), mkb(CI7$C_cb, CI7$C_cb_lo, CI7$C_cb_hi, MC, PK),
@@ -162,10 +166,10 @@ pw <- fbase(LB, c(0.35, 11.2)) +
        x = "HR per SD of KSAA (95% CI)", y = NULL) +
   theme(plot.subtitle = element_text(size = FS, colour = INK, margin = margin(b = 2)))
 
-# ---- C–E: HRs of the cross-classified cells (reference Q1×Q1; colored by log HR, so 0.5 and 2 are equidistant) ----
+# ---- C-E: HRs of the cross-classified cells (reference Q1 x Q1; colored by log HR) ----
 QL <- paste0("Q", 1:4)
 JC$y <- factor(JC$y, QL); JC$x <- factor(JC$x, QL)
-LIM <- log(5); BRK <- c(0.5, 1, 2, 4)   # upper limit covers the highest weighted cell (cardiovascular Q4×Q4 = 4.49)
+LIM <- log(5); BRK <- c(0.5, 1, 2, 4)   # covers the highest cell (cardiovascular Q4 x Q4, HR 4.49)
 FW <- as.numeric(Sys.getenv("FIG3_W", "6.27")); FH <- as.numeric(Sys.getenv("FIG3_H", "5.5")); R3 <- as.numeric(Sys.getenv("FIG3_R3", "0.62")); HM_ASP <- as.numeric(Sys.getenv("FIG3_ASP", "0"))
 stopifnot(max(abs(log(JC$hr))) < LIM)   # the heat maps share one color scale; no cell may exceed it
 JC$dark <- abs(log(JC$hr)) > 0.8
@@ -173,7 +177,7 @@ HM_FS <- as.numeric(Sys.getenv("FIG3_HMFS", "4.2"))   # axis labels / axis title
 HM_TY <- as.numeric(Sys.getenv("FIG3_HMTY", "0.97"))   # vertical position of panel letters (npc of the whole panel, 1 = top): smaller is closer to the heat map
 HM_RM <- as.numeric(Sys.getenv("FIG3_HMRM", "12"))    # right margin of the heat maps (pt): the color bar goes here, and the value also sets the right edge of E
 HM_LX <- as.numeric(Sys.getenv("FIG3_HMLX", "1.005"))  # color-bar position relative to the right edge of the tiles (1 = adjacent); too large overlaps the y-axis title of the next panel
-HM_RME <- as.numeric(Sys.getenv("FIG3_HMRME", "0"))   # right margin of E: 0 = tiles extend to the right edge of the cell (the color bar is drawn in the canvas margin and not clipped); negative values are clamped to 0
+HM_RME <- as.numeric(Sys.getenv("FIG3_HMRME", "0"))   # right margin of E (pt); 0 = tiles reach the cell edge and the color bar sits in the canvas margin
 heat <- function(tag, letter, outcome, showleg = FALSE, rm = HM_RM) {   # the heat maps share one color scale, drawn once on the right map
   g <- JC[JC$panel == tag, ]
   ggplot(g, aes(x, y, fill = log(hr))) + geom_tile(colour = "white", linewidth = 0.8) +
@@ -187,7 +191,7 @@ heat <- function(tag, letter, outcome, showleg = FALSE, rm = HM_RM) {   # the he
     coord_cartesian(clip = "off") +
     labs(tag = letter, subtitle = " ", x = "Phenotypic Age acceleration quartile", y = "KSAA quartile") + thk +
     theme(axis.line = element_blank(), panel.border = element_blank(), axis.ticks = element_blank(),
-          # letters are placed with plot.tag (gtable clamps a negative bottom margin of plot.title); the tag takes no space and its y is HM_TY
+          # panel letters via plot.tag (gtable clamps a negative plot.title margin); y position HM_TY
           plot.tag = element_text(size = 8, face = "bold", colour = INK, hjust = 0, vjust = 1),
           plot.tag.position = c(0.002, HM_TY), plot.tag.location = "plot",
           axis.text = element_text(colour = INK, size = HM_FS), axis.title = element_text(colour = INK, size = HM_FS),
@@ -198,14 +202,14 @@ heat <- function(tag, letter, outcome, showleg = FALSE, rm = HM_RM) {   # the he
           plot.margin = margin(2, rm, 1, 2),   # room on the right for the color bar (otherwise clipped); E uses a smaller value so the color bar ends at the right end of the x axis of B
           legend.title = element_text(size = HM_FS, colour = INK, margin = margin(b = 2)), legend.text = element_text(size = HM_FS, colour = INK),
           legend.key.width = unit(3.5, "pt"), legend.key.height = unit(10, "pt"), legend.ticks.length = unit(1, "pt")) +
-    # no aspect ratio by default (HM_ASP = 0): the panel fills its cell so the left/right edges can be computed to align with B; tile shape is set by the row height R3.
+    # no fixed aspect ratio (HM_ASP = 0), so the panel edges can be aligned with B; tile shape follows the row height
     (if (HM_ASP > 0) theme(aspect.ratio = HM_ASP) else NULL)
 }
 pe <- heat("main", "C", "All-cause mortality", showleg = TRUE)
 pf <- heat("main_cvd", "D", "Cardiovascular mortality", showleg = TRUE)
 pg <- heat("main_cancer", "E", "Cancer mortality", showleg = TRUE, rm = HM_RME)
 
-# Legend: made from a small plot drawn only for its legend, whose grob is placed alone in the top row; patchwork's guides = "collect" is not used (it would also collect the heat-map color bar)
+# shared legend taken from a dummy plot and placed in the top row (guides = "collect" would also collect the heat-map color bar)
 leg_grob <- function(lv, sizes, w) {
   LG <- data.frame(series = factor(lv, lv), x = seq_along(lv), y = 1)
   pl <- ggplot(LG, aes(x, y, colour = series, shape = series)) + geom_point() + scale_colour_manual(values = PAL[lv], name = NULL) + scale_shape_manual(values = SHP[lv], name = NULL) + thk +
@@ -216,14 +220,14 @@ leg_grob <- function(lv, sizes, w) {
 NOLEG <- theme(legend.position = "none")
 FH <- as.numeric(Sys.getenv("FIG3_H", "3.6"))   # two rows; without a fixed aspect ratio the row height is the height of the tiles
 # pw (HR of KSAA within each PhenoAge quartile) is computed but not plotted; its heterogeneity P is cited in the text.
-# A and B are each laid out with wrap_elements: otherwise patchwork aligns the axis areas in the row and the axis of A detaches from its panel.
+# A and B are wrapped with wrap_elements; otherwise patchwork aligns their axis areas and the axis of A detaches from its panel
 toprow <- wrap_elements(full = pc + NOLEG) + wrap_elements(full = pd + NOLEG) + plot_layout(widths = c(1.15, 1.25))
-BL <- as.numeric(Sys.getenv("FIG3_BL", "0.11")); BR <- as.numeric(Sys.getenv("FIG3_BR", "0"))   # left/right margins: left edge of C aligned with the y axis of A, right edge of E with the right end of the x axis of B
+BL <- as.numeric(Sys.getenv("FIG3_BL", "0.11")); BR <- as.numeric(Sys.getenv("FIG3_BR", "0"))   # side margins: align C with the y axis of A and E with the end of the x axis of B
 botrow <- plot_spacer() + pe + pf + pg + plot_spacer() + plot_layout(widths = c(BL, 1, 1, 1, BR))   # three heat maps side by side (cancer cells have few events and wide CIs)
 p <- wrap_plots(L = wrap_elements(full = leg_grob(c(PA, KS, PK), c(1.6, 1.5, 1.9), FW)), A = wrap_elements(full = toprow), B = wrap_elements(full = botrow),
                 design = "L\nA\nB", heights = c(.06, .68, R3)) +
   plot_annotation(theme = theme(plot.margin = margin(4, 4, 4, 4)))
-ggsave(tempfile(fileext = ".png"), p, width = FW, height = FH, dpi = 300, bg = "white")   # warm-up render (the first render measures text sizes wrongly on this machine; see the Figure 2 script)
+ggsave(tempfile(fileext = ".png"), p, width = FW, height = FH, dpi = 300, bg = "white")   # warm-up render: the first render can mis-measure text sizes
 save_fig(p, "Figure3", FW, FH)
 
 cat("\nPanel values (n = 4,522; combined-score values are apparent, without optimism correction)\n")

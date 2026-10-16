@@ -1,12 +1,10 @@
-"""Train the knee ROI detector (2 classes: participant's right knee / left knee).
+"""Train the YOLO11s knee detector (two classes: participant's right and left knee).
 
-Labels come from heuristic bootstrapping, not a manual gold standard - 23 of 24 checked boxes were correct (~96%).
-Remaining noise is handled in two ways:
-  1. automatic exclusion by suspicion score before training (weak joint-localization dip, or left-right joint-row difference >250)
-  2. the detector averages over label noise and learns anatomy rather than memorizing films
+Labels come from heuristic bootstrapping (23 of 24 checked boxes correct), not manual annotation. Films with a high
+suspicion score (weak joint-space dip, or left-right joint-row difference > 250) are excluded before training.
 
-Key setting fliplr=0.0: the knees are mirror images, so horizontal-flip augmentation would make the two classes
-indistinguishable in pixels and break the laterality head (same reason flips are off in eus_det/train_five.py).
+Horizontal flipping is disabled (fliplr=0): the two knees are mirror images, so flipping would make the classes
+indistinguishable.
 """
 import os, csv, random, shutil, sys
 SRC = "/home/data/knee_yolo"
@@ -39,7 +37,7 @@ if "--train" in sys.argv:
     m.train(data=f"{DS}/data.yaml", epochs=80, imgsz=1024, batch=8,
             device=0, workers=8, patience=25,
             project="/home/data/knee_yolo/runs", name="det_v1", exist_ok=True,
-            fliplr=0.0,      # knees are mirror-symmetric; never flip horizontally
+            fliplr=0.0,      # no horizontal flips (see docstring)
             flipud=0.0,
             degrees=4.0, translate=0.08, scale=0.25, shear=0.0,
             mosaic=0.5, close_mosaic=15, hsv_h=0.0, hsv_s=0.0, hsv_v=0.3)

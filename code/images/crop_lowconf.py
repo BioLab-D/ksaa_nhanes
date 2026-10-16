@@ -1,9 +1,8 @@
-"""Crop the low-confidence rescued films (boxes_lowconf.csv).
+"""Crop ROIs of the films rescued with relaxed detection thresholds (boxes_lowconf.csv).
 
-Unlike boxes_rot.csv, this is a **wide table**: one row per film, with columns for each knee,
-and no rotation - coordinates are relative to the original TIFF. Cropping is identical to crop_rois.py
-(square box 1.15 × bone width, 512 px, 16-bit); otherwise the ROI scale of these 107 films would not match
-the 9,536 ROIs of the main sample, and merging them would introduce a batch variable.
+boxes_lowconf.csv has one row per film with columns for each knee, and coordinates refer to the unrotated TIFF.
+Cropping follows crop_rois.py (square box 1.15 x bone width, 512 px, 16-bit), so these 107 films have the same ROI scale
+as the rest of the sample.
 """
 import os, csv, numpy as np
 from multiprocessing import Pool

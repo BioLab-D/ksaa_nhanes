@@ -1,4 +1,5 @@
-# Extract demographics, covariates and mortality linkage of the imaging cohort from the NHANES III DuckDB → results/work/surv_labels.csv
+# Demographics, covariates and linked mortality of the imaging cohort from the NHANES III DuckDB
+# Input: data/nhanes3/nhanes3_knee_cohort.duckdb; output: results/work/surv_labels.csv
 suppressMessages(library(duckdb))
 sp <- here::here("results", "work")
 con <- dbConnect(duckdb::duckdb(),here::here("data", "nhanes3", "nhanes3_knee_cohort.duckdb"),read_only=TRUE)
@@ -9,13 +10,13 @@ d <- dbGetQuery(con,"
         a.DMARETHN AS race, a.DMPPIR AS pir, a.HFA8R AS edu,
         e.BMPBMI AS bmi, e.BDPFNBMD AS fnbmd,
         a.WTPFEX2, a.WTPFEX6, a.SDPPSU2, a.SDPSTRA2, a.SDPPSU6, a.SDPSTRA6,
-        m.MORTSTAT, m.PERMTH_INT, m.PERMTH_EXM, m.UCOD_LEADING   -- PERMTH_EXM added 2026-09-18 (analysis time zero = examination)
+        m.MORTSTAT, m.PERMTH_INT, m.PERMTH_EXM, m.UCOD_LEADING   -- PERMTH_EXM: follow-up from the examination
  FROM img i JOIN nhanes3_adult a USING(SEQN)
  LEFT JOIN nhanes3_exam e USING(SEQN)
  LEFT JOIN nhanes3_mortality m USING(SEQN)")
 dbDisconnect(con,shutdown=TRUE)
 
-# NHANES III missing sentinels (all-8 codes) set to NA
+# NHANES III missing codes (all 8s) -> NA
 d$bmi[d$bmi   >= 100] <- NA
 d$fnbmd[d$fnbmd >= 3] <- NA
 d$pir[d$pir     >= 50] <- NA

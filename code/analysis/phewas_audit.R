@@ -1,14 +1,15 @@
-# PheWAS variable audit table (Table S8): inclusion status of each variable by health meaning -> duplicates and compositional overlap -> eligible population -> data quality; effect sizes and P values are not used.
-# Input: results/analysis/phewas/ewas_audit_counts.csv (per-variable counts from phewas_clean.R EWAS_STAGE=audit, no models), ewas_candidates.csv (825-pool flags)
-# Output: results/analysis/phewas/ewas_audit_table.csv, one row per candidate (health domain, type, eligible population, phase, valid rate, sample size, status, reason, etc.)
-# Status: main (main analysis) / supplementary / exposure_module (extended association module) / covariate / excluded / review (manual review)
+# PheWAS variable audit (Table S8): assigns each candidate a status from its health meaning, duplication and overlap,
+#   eligible population and data quality. Effect sizes and P values are not used.
+# Status: main / supplementary / exposure_module (extended module) / covariate / excluded / review
+# Input: results/analysis/phewas/ewas_audit_counts.csv (phewas_clean.R), ewas_candidates.csv (candidate pool, from data/phewas/)
+# Output: results/analysis/phewas/ewas_audit_table.csv, one row per candidate
 ew <- here::here("results", "analysis", "phewas")
 A <- read.csv(file.path(ew, "ewas_audit_counts.csv"), stringsAsFactors = FALSE)
 cand <- read.csv(file.path(ew, "ewas_candidates.csv"), stringsAsFactors = FALSE)
 A$in_pool <- A$variable %in% cand$variable[cand$analysed == "TRUE" | cand$analysed == TRUE]
 lab <- tolower(A$label); sec <- A$section; sub <- A$subsection
 
-# ---------- 1. Health-meaning class (by module first, then overridden by label) ----------
+# ---------- 1. Health class: by questionnaire section, then by label ----------
 OBJ_SEC <- c("HEMATOLOGY", "GENERAL BIOCHEMISTRY TESTS", "BIOCHEMISTRY PROFILE", "DIABETES TESTING PROFILE", "URINE TESTS", "BODY MEASUREMENTS",
              "BONE DENSITOMETRY", "SPIROMETRY", "GALLBLADDER ULTRASONOGRAPHY", "FUNDUS PHOTOGRAPHY", "DENTAL EXAMINATION", "PHYSICIAN'S EXAMINATION",
              "CENTRAL NERVOUS SYSTEM FUNCTION EVALUATION", "ALLERGY SKIN TEST", "ANTIBODY TESTS")
@@ -33,7 +34,7 @@ cls[grepl("^HAY11", A$variable)] <- "objective"                                 
 cls[grepl("^PEP13E[1-5]A$", A$variable)] <- "function"                                             # physician-estimated activity difficulty: physical function
 cls[grepl("^HAP17|^HAP18", A$variable)] <- "objective"                                              # cognitive test items (registration, serial subtraction)
 cls[grepl("^HAP1[0-3]$", A$variable)] <- "symptom"                                                 # hearing: deafness, hearing aid, hearing difficulty
-# label overrides (finer meaning within questionnaires)
+# label-based overrides within questionnaires
 q <- !(sec %in% OBJ_SEC) & !(cls %in% c("objective", "psychosocial", "non_outcome")) & !grepl("SECTION E\\. HOUSING", sub)
 cls[q & grepl("smok|cigar|tobacco|snuff|chew|alcohol|drink|beer|wine|liquor|vitamin|supplement|calcium tablet|exercise|jog|swim|garden|bicycl|dance|calisthen|lift weights|physical activ|active compared|walk .*mile|milk|\\bdiet|\\beat\\b|\\bfood|\\bmeal|coffee|\\btea\\b", lab)] <- "exposure"   # behaviour/diet keywords first; later disease/function/symptom rules may override (e.g. HAH6, difficulty preparing meals, is a function item)
 cls[q & grepl("doctor (ever )?told|told by a doctor|ever been told|ever told you|diagnos|ever had|have you had|ever have", lab)] <- "disease"
@@ -49,7 +50,7 @@ cls[grepl("consider self over|like to weigh", lab)] <- "review_self_perception"
 cls[A$variable %in% c("PEP13A", "HAB1")] <- "self_rated"
 cls[A$variable == "PHPINSU"] <- "disease"
 cls[grepl("^HAE8", A$variable)] <- "exposure"
-# HAE advice/behaviour items: lifestyle (weight loss, salt restriction, exercise, etc.) -> exposure; medication -> disease (HAE4A/5A antihypertensives, HAE8D/9D lipid-lowering drugs)
+# HAE advice items: lifestyle advice -> exposure; medication (HAE4A/5A antihypertensives, HAE8D/9D lipid-lowering) -> disease
 cls[A$variable %in% c("HAE4B", "HAE4C", "HAE4D", "HAE5B", "HAE5C", "HAE9B", "HAE9C")] <- "exposure"
 cls[A$variable %in% c("HAE4A", "HAE5A", "HAE8D", "HAE9D")] <- "disease"
 cls[A$variable %in% c("HFE1", "HFE2", "HFE3")] <- "covariate"                                     # home age/number of rooms/years at residence: not exposures
@@ -77,10 +78,12 @@ core <- A$health_class %in% c("objective", "disease", "symptom", "function", "se
 A$health_class[A$health_class == "reproductive"] <- "reproductive_exposure"
 A$target_pop[A$health_class == "reproductive_exposure"] <- "women only"
 A$health_class[A$health_class %in% c("review_prognosis", "review_self_perception", "review_observation")] <- "non_outcome"
-# repeated-measure families: single home BP readings excluded (combined means HAZMNK1R/K5R used); 6 story-recall segments and 4 address-orientation items summed into scores (built in phewas.R)
+# repeated measures: single home BP readings excluded (means HAZMNK1R/K5R used); story-recall segments and address
+#   orientation items are summed into scores in phewas.R
 A$health_class[grepl("^HAZA8[ABC]K[15]|^HAZA11[AB]R|^PEPMNK[15]R$|^PEP6[GHI][13]$", A$variable)] <- "non_outcome"   # single readings and separate home/MEC means: use HAZMNK1R/K5R (combined home + MEC means)
 A$summarise_to <- ifelse(grepl("1st story recall", lab), "MAPB_story_recall_immediate_total", ifelse(grepl("2nd story recall", lab), "MAPD_story_recall_delayed_total", ifelse(grepl("^HAA6", A$variable), "HAA_orientation_score", "")))
-# summaries of other repeated measures and multi-item tests (built in phewas.R): walk -> gait speed (faster trial); steps, pulse -> mean; serial subtraction, three-word registration/recall -> number correct
+# other summaries built in phewas.R: gait speed (faster trial), mean steps and pulse, number correct in serial subtraction
+#   and three-word registration/recall
 SUMM <- c(PFPTWLKA = "PFP_gait_speed", PFPTWLKB = "PFP_gait_speed", PFPNSTPA = "PFP_steps_8ft_mean", PFPNSTPB = "PFP_steps_8ft_mean",
           HAZA5R = "pulse_mean", PEP6DR = "pulse_mean", HAP18A = "HAP18_serial_subtraction", HAP18B = "HAP18_serial_subtraction", HAP18C = "HAP18_serial_subtraction",
           HAP18D = "HAP18_serial_subtraction", HAP18E = "HAP18_serial_subtraction", HAP17A1 = "HAP17_word_registration", HAP17A2 = "HAP17_word_registration",

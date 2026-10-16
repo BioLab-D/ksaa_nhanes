@@ -12,7 +12,8 @@ f2 <- function(x, d = 2) mi(sub("^-(0\\.0+)$", "\\1", formatC(round(x + sign(x) 
 ci <- function(h, l, u, d = 2) ifelse(is.na(h), "", sprintf("%s (%s%s%s)", f2(h, d), f2(l, d), ifelse(l < 0 | u < 0, " to ", "\u2013"), f2(u, d)))
 cm <- function(x) formatC(round(x), format = "d", big.mark = ",")
 
-# Forest plot: F needs columns lab, hdr (logical), est, lo, hi, txt; optional series (color) and filled. The three columns (labels | forest | values) are drawn as separate plots and combined so text never overlaps the next panel
+# Forest plot: F has columns lab, hdr (logical), est, lo, hi, txt, optionally series (color) and filled.
+#   Labels, forest and values are drawn as three plots and combined, so text never overlaps the next panel.
 forest <- function(F, title, xlab, xlim, breaks, ref = 1, pal = c(main = BLUE), widths = c(1.35, 1, 0.62), lab_size = 2.4) {
   F$y <- rev(seq_len(nrow(F))); if (is.null(F$series)) F$series <- names(pal)[1]; if (is.null(F$filled)) F$filled <- TRUE
   yl <- c(0.5, nrow(F) + 0.5); G <- F[!F$hdr, ]; many <- length(pal) > 1
@@ -42,7 +43,7 @@ grab <- function(file, key, after = "HR ") {
 }
 save_fig <- function(p, name, w, h) {  # PNG always; PDF best effort
   ggsave(file.path(FIGD, paste0(name, ".png")), p, width = w, height = h, dpi = 300, bg = "white")
-  # if cairo fails to load, ggsave may write nothing without an error: remove the old PDF first and fall back to quartz if cairo wrote nothing
+  # if cairo fails to load, ggsave may silently write nothing: remove the old PDF first and fall back to quartz
   pdf_f <- file.path(FIGD, paste0(name, ".pdf")); if (file.exists(pdf_f)) file.remove(pdf_f)
   try_dev <- function(dev) tryCatch({ suppressWarnings(dev()); file.exists(pdf_f) && file.size(pdf_f) > 0 },
                                     error = function(e) { cat("  PDF(", conditionMessage(e), ")\n"); FALSE })

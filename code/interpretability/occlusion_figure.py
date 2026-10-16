@@ -1,7 +1,8 @@
-# Occlusion sensitivity example figure: same layout as the saliency_figure.py examples (same 6 knees, titles, frame colors, colormap), overlaying |Δ predicted age| from occlusion_map.py,
-#   lightly Gaussian-smoothed for display (sigma = 2 grid cells = 8 px at 448, about half a patch); the 6 panels share one color scale (99.5th percentile of the pooled smoothed maps) with a color bar.
-# Input: results/analysis/saliency/occlusion_map_examples.npz, ksaa_for_saliency.csv; ROI images (KNEE_ROI).
-# Output: results/figures/FigureS2.{png,pdf} (Supplementary Fig. S2). Run (from the repository root): python code/interpretability/occlusion_figure.py
+# Fig. S2: occlusion sensitivity maps of the six example right knees (occlusion_map.py), in the layout of the Grad-CAM examples.
+#   Maps are lightly smoothed for display (sigma 2 grid cells = 8 px at 448) and share one color scale (99.5th percentile).
+# Input: results/analysis/saliency/{occlusion_map_examples.npz, ksaa_for_saliency.csv}, ROI images
+# Output: results/figures/FigureS2.{png,pdf}
+# Run: python code/interpretability/occlusion_figure.py
 import os, sys, csv, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from saliency_common import KB, OUT, roi_file, pre
@@ -16,7 +17,7 @@ CM = LinearSegmentedColormap.from_list("sal", ["#000000", "#5b1a8a", "#d1335b", 
 mi = lambda s: s.replace("-", "−")
 
 Z = np.load(os.path.join(OUT, "occlusion_map_examples.npz")); SEQ = list(Z["seqn"]); assert str(Z["side"]) == "R"
-M = TF.gaussian_blur(torch.from_numpy(Z["abs"]).float()[:, None], kernel_size=13, sigma=2.0)[:, 0].numpy()   # light smoothing of the 16-pixel stride blockiness
+M = TF.gaussian_blur(torch.from_numpy(Z["abs"]).float()[:, None], kernel_size=13, sigma=2.0)[:, 0].numpy()   # smooth out the 16-pixel stride
 info = {r["SEQN"]: r for r in csv.DictReader(open(os.path.join(OUT, "ksaa_for_saliency.csv")))}
 pairs = [(0, 1), (2, 3), (4, 5)]                                     # (younger-appearing, older-appearing), in the order of occlusion_map.py --seqn
 VMAX = float(np.percentile(M, 99.5))                                 # shared color scale

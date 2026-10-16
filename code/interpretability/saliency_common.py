@@ -1,4 +1,4 @@
-# Shared parts of the interpretability analyses (saliency.py, saliency_images.py, saliency_figure.py): training-time preprocessing and anatomical regions.
+# Shared code for the interpretability scripts: paths, preprocessing as in training, anatomical regions.
 import os, numpy as np, torch, torch.nn.functional as F
 from PIL import Image
 KB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -15,7 +15,8 @@ def roi_file(seqn, side):                                           # 3 particip
     return f if os.path.exists(f) else os.path.join(ROI, f"{seqn}K2_{side}.png")
 
 def pre(f, side):
-    """Reproduces model/knee_v2.py exactly: pct (per-image 0.5-99.5 percentiles -> [0,1]), horizontal mirroring of the left knee, bilinear resize to 448. Returns an [S,S] unit-gray tensor."""
+    """Preprocessing of code/model/knee_v2.py (--norm pct): per-image 0.5-99.5 percentiles -> [0,1], left knee mirrored,
+    bilinear resize to 448. Returns an [S,S] tensor."""
     im = np.asarray(Image.open(f)).astype(np.float32)
     lo, hi = np.percentile(im[::2, ::2], [0.5, 99.5]); x = np.clip((im - lo) / max(hi - lo, 1.0), 0.0, 1.0)
     if side == "L": x = x[:, ::-1]
@@ -27,13 +28,13 @@ def pool(t):                                                         # [S,S] -> 
     return F.adaptive_avg_pool2d(t[None, None], R)[0, 0]
 
 def joint_line(u):
-    """u: [R,R] unit gray. Joint line = deepest "valley" of the row profile over the central half-width (columns 28-83) (largest difference from the mean of the 6 rows above and below; searched in rows 36-76).
-    After mirroring, lateral (fibular side) is on the left and medial on the right."""
+    """Joint line of a [R,R] image: the row (36-76) whose mean intensity over columns 28-83 is furthest below the mean of the
+    rows 6 above and 6 below. After mirroring, lateral (fibular side) is on the left and medial on the right."""
     p = np.convolve(np.asarray(u, np.float32)[:, 28:84].mean(1), np.ones(3) / 3, "same"); r = np.arange(36, 77)
     return int(r[((p[r - 6] + p[r + 6]) / 2 - p[r]).argmax()])
 
 def regions(u):
-    """6 anatomical regions (femur / joint band / tibia x lateral / medial), [6,R,R] boolean, non-overlapping and covering the whole image."""
+    """6 non-overlapping regions covering the image (femur / joint band / tibia x lateral / medial), [6,R,R] boolean."""
     j = joint_line(u); rows = np.arange(R)[:, None]; med = np.arange(R)[None, :] >= R // 2
     band = np.where(rows < j - HALF, 0, np.where(rows <= j + HALF, 1, 2))
     return np.stack([(band == b) & (med == bool(s)) for b in range(3) for s in range(2)]), j

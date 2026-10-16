@@ -1,6 +1,7 @@
 #!/bin/bash
-# Download the NHANES III knee radiographs (877 files; completeness checked against the byte sizes published by CDC in the manifest, -c resumes, several retry rounds).
-# --no-check-certificate: a TLS-intercepting device on the route breaks certificate validation; integrity is ensured by the byte-size check.
+# Download the NHANES III knee radiographs listed in MANIFEST (file name and CDC byte size, tab-separated).
+# Repeats wget -c passes until every file has the listed size. --no-check-certificate was needed behind a TLS-intercepting
+# proxy; file sizes are checked instead (also check the TIFF header, since such proxies can return HTML pages).
 
 DIR=/home/data/knee_xray
 MANIFEST=/home/data/knee_xray_manifest.tsv
@@ -32,4 +33,4 @@ for pass in $(seq 1 $MAXPASS); do
 done
 
 echo "=== finished $(date '+%F %T') ==="
-echo "still incomplete: $(remaining | wc -l) / 877"
+echo "still incomplete: $(remaining | wc -l) / $(wc -l < "$MANIFEST")"

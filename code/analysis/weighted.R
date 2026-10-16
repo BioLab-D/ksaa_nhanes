@@ -1,5 +1,6 @@
-# Weighted primary analyses (models; standardized risks and discrimination, which need replicate-weight bootstrap, are in weighted_boot.R)
-# Outputs in results/analysis/weighted/: table2, tableS4, tableS5, tableS7, tableS10 (+ _gait_extra), figure3a, figure3_cells/_within, figureS3, model1_full_cohort (.csv); run by run_all.sh
+# Survey-weighted primary analyses (regression models); standardized risks and discrimination are in weighted_boot.R.
+# Output (results/analysis/weighted/*.csv): table2, tableS4, tableS5, tableS7, tableS10 (+ _gait_extra), figure3a, figure3_cells,
+# figure3_within, figureS3, model1_full_cohort
 source(here::here("code", "analysis", "weighted_common.R"))
 suppressMessages({library(mice); library(mitools)})
 
@@ -16,7 +17,7 @@ for (o in names(EV)) for (mn in names(MODS)) { des <- dom6(F$cc); ev <- EV[[o]]
 write.csv(T2, file.path(W, "table2.csv"), row.names = FALSE)
 for (i in seq_len(nrow(T2))) with(T2[i, ], cat(sprintf("  %-8s %s  SD %s  Q2 %s  Q3 %s  Q4 %s  P trend %.3g\n", outcome, model, fci(hr_sd, lo_sd, hi_sd), fci(hr_q2, lo_q2, hi_q2), fci(hr_q3, lo_q3, hi_q3), fci(hr_q4, lo_q4, hi_q4), p_trend)))
 
-# ---------------- Table S4: Fine–Gray (weighted; after finegray expansion weight = survey weight × fgwt, design variables copied with each row) ----------------
+# ---------------- Table S4: Fine–Gray (weight = survey weight x fgwt after finegray expansion) ----------------
 cat("\n=========== Table S4 Fine–Gray (weighted) ===========\n")
 C <- F[F$cc, ]; C$id <- seq_len(nrow(C))
 FG <- NULL
@@ -44,7 +45,7 @@ F$ab5 <- cut(F$age, c(59, 64, 69, 74, 79, 84, 120))
 dd <- d; dd$pooled <- resid(lm(pred_raw ~ age, dd)); fmn <- tapply(dd$gap, dd$fold, mean); dd$fcent <- dd$gap - fmn[as.character(dd$fold)]
 SDX <- sapply(c("gap_raw", "pooled", "fcent"), function(v) sd(dd[[v]]))
 for (v in c("pooled", "fcent")) F[[v]] <- dd[[v]][match(F$SEQN, dd$SEQN)]
-D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)        # rebuilt to include the new columns
+D6 <- svydesign(id = ~P6, strata = ~S6, weights = ~W6, nest = TRUE, data = F)        # rebuilt with the new columns
 F2 <- F[F$phase_all == 2 & !is.na(F$W2) & F$W2 > 0, ]; D2 <- svydesign(id = ~P2, strata = ~S2, weights = ~W2, nest = TRUE, data = F2)
 rhs3 <- function(sub, age_term = "age") { keep <- COV[!sapply(M3V, function(v) length(unique(F[sub, v])) < 2)]; keep[keep == "age"] <- age_term; paste(keep, collapse = " + ") }
 wrow <- function(lab, sub, des_fun = dom6, x = "z", k = 1, age_term = "age") { a <- wcox(des_fun(sub), paste(x, "+", rhs3(sub, age_term)), term = x, k = k)
@@ -69,7 +70,7 @@ S5 <- rbind(
   wrow("KSAA centred within each outer fold", cc, x = "fcent", k = SDX[["fcent"]]))
 u <- coxph(as.formula(paste("Surv(t, e) ~ z +", MODS[["m3"]])), F[cc, ]); ub <- coef(u)[["z"]]; use <- sqrt(vcov(u)["z", "z"])
 S5 <- rbind(S5, data.frame(label = "Unweighted", n = u$n, deaths = u$nevent, t(ci3(ub, use))))
-# Multiple imputation (mice, 20 imputations, including the Nelson–Aalen cumulative hazard; survey design built on the study cohort in each imputed data set)
+# Multiple imputation (mice, 20 imputations, Nelson–Aalen cumulative hazard as a predictor; design built on the cohort in each data set)
 IV <- c("edu3", "smk3", "alc3", "pa3", "bmi", "htn", "dm", "tc", "hdl", "egfr", "cvd_hist", "cancer_hist")
 di <- d[, c("t", "e", "e_cvd", "e_cancer", "gap", "z", "q", "age", "sex", "race", IV, "WTPFEX6", "SDPPSU6", "SDPSTRA6")]
 for (v in c("sex", "race", "htn", "dm", "cvd_hist", "cancer_hist")) di[[v]] <- factor(di[[v]])
@@ -174,7 +175,7 @@ for (i in seq_len(nrow(S11))) with(S11[i, ], cat(sprintf("  %-9s %4s/%4d  M1 %s 
 
 cat("\n-> results/analysis/weighted/\n")
 
-# ---------------- Figure 1D: weighted HR in the full cohort, age + sex (same basis as the Figure 2 curves) ----------------
+# ---------------- Figure 1D: weighted HR in the full cohort, age + sex (as for the Figure 2 curves) ----------------
 M1F <- do.call(rbind, lapply(names(EV), function(o) { a <- wcox(dom6(F$inc), "z + age + factor(sex)", ev = EV[[o]]); data.frame(outcome = o, n = a[["n"]], events = a[["events"]], hr_sd = a[["hr"]], lo_sd = a[["lo"]], hi_sd = a[["hi"]]) }))
 write.csv(M1F, file.path(W, "model1_full_cohort.csv"), row.names = FALSE)
 for (i in seq_len(nrow(M1F))) with(M1F[i, ], cat(sprintf("  Figure 1D full cohort, age + sex %-8s %s\n", outcome, fci(hr_sd, lo_sd, hi_sd))))

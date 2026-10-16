@@ -1,4 +1,6 @@
-# Supplementary figure: age-bias correction. A, whole cohort: age gap vs chronological age before / after correction (with marginal histograms) and per-participant |error| vs age + loess; B, the same before / after scatter by survey phase (1 / 2).
+# Fig. S1: age-bias correction. A, whole cohort: age gap vs chronological age before and after correction (with marginal
+#   histograms) and absolute error vs age with a loess curve; B, the before/after scatter by survey phase.
+# Input: results/ksaa_oof.csv, results/work/surv_labels.csv
 # Output: results/figures/FigureS1.{png,pdf}
 suppressMessages({library(ggplot2); library(patchwork)})
 res <- here::here("results"); fig <- here::here("results", "figures")
@@ -27,8 +29,8 @@ errsc <- function(y, ttl, corrected=FALSE){ dd <- d; dd$ae <- abs(dd[[y]])
     geom_point(colour=BLUE, alpha=0.18, size=0.5, stroke=0, shape=16) + geom_smooth(method="loess", formula=y~x, span=0.4, se=FALSE, colour=RED, linewidth=1) +
     scale_x_continuous(limits=lim, breaks=seq(60,90,10), labels=AGELAB, expand=c(0,0)) + scale_y_continuous(breaks=seq(0,20,5)) + coord_cartesian(ylim=c(0,20)) +
     labs(title=ttl, x="Chronological age, years", y="Absolute error, years") + th +
-    theme(axis.text.y.left=element_text(margin=margin(l=YM[1]+2.17, r=YM[2])))  # widest top-row tick label is "-20": pad the left by one hyphen width (2.17 pt) so the y axes of both rows align
-  void <- ggplot() + theme_void()  # same skeleton as gapsc(), used as an empty placeholder (plot_spacer alone gives unequal panel widths)
+    theme(axis.text.y.left=element_text(margin=margin(l=YM[1]+2.17, r=YM[2])))  # pad by one hyphen width (2.17 pt) so the y axes of both rows align
+  void <- ggplot() + theme_void()  # empty placeholder with the layout of gapsc() (plot_spacer gives unequal panel widths)
   void + plot_spacer() + p + void + plot_layout(ncol=2, widths=c(5,1), heights=HH) }
 # A
 A1 <- wrap_elements(full=gapsc(d, "gap_raw", "Before bias correction")); A2 <- wrap_elements(full=gapsc(d, "gap", "After bias correction", TRUE))
@@ -48,7 +50,7 @@ pdf_f <- file.path(fig,"FigureS1.pdf"); if (file.exists(pdf_f)) file.remove(pdf_
 tryCatch(suppressWarnings(ggsave(pdf_f, p, width=7.2, height=FH, device=cairo_pdf, bg="white")), error=function(e) NULL)
 if (!file.exists(pdf_f) && capabilities("aqua")) tryCatch(ggsave(pdf_f, p, width=7.2, height=FH, device=grDevices::quartz, type="pdf", bg="white"), error=function(e) NULL)
 cat(if (file.exists(pdf_f)) "  PDF written\n" else "  PDF not written\n")
-# Numbers: calibration formulas (overall, by sex) and correlations
+# console: bias-correction formulas (overall, by sex) and correlations
 f0 <- lm(pred_raw~age, d); fm <- lm(pred_raw~age, d[d$sex==1,]); ff <- lm(pred_raw~age, d[d$sex==2,])
 cat(sprintf("gap~age r before correction %.3f, after %+.4f; E[raw|age] = %.2f + %.3f×age; men %.2f + %.3f×age; women %.2f + %.3f×age; corrected gap SD %.2f\n",
   cor(d$gap_raw,d$age), cor(d$gap,d$age), coef(f0)[1],coef(f0)[2], coef(fm)[1],coef(fm)[2], coef(ff)[1],coef(ff)[2], sd(d$gap)))

@@ -1,34 +1,36 @@
-"""Knee-adapted training script v2 (2026-09-10).
+"""Knee age model: Mammo-AGE adapted to bilateral knee radiographs, trained under participant-level five-fold cross-fitting.
 
-Starts from the official port mammo_official.py and turns each issue raised in the review into a switch; **every switch defaults to v1 (the official port)**,
-so running without switches reproduces v1; screening changes one switch at a time.
-  --aug official|knee      knee: drop elastic/grid/optical distortion and median blur; geometry (rotation ±5°, shift ≤5%, scale 0.95–1.05, p 0.5) independent per knee;
-                           photometry (brightness/contrast ±10% p 0.5, gamma 0.9–1.1 p 0.3, 3×3 Gaussian blur p 0.15) shares one parameter set for both knees of a film;
-                           Gaussian noise (SD 0.007–0.012, i.e. v1 var 3–9 / 255², p 0.2) shared strength, sampled per knee;
-                           CoarseDropout (8 holes, side 10%, p 0.2, as v1 albumentations defaults) independent per knee
-  --norm minmax8|pct|global  minmax8: per-image min–max -> uint8 (v1); pct: per-image [P0.5, P99.5] linearly mapped to float32 [0,1];
-                           global: [P0.5, P99.5] pooled over training-fold pixels mapped to [0,1], keeping between-image contrast; pct/global then standardized by training-fold pixel mean/SD
-  --sched step|cosine      step: Adam, wd 0, ×0.1 at epochs 20/40/60/80 (v1); cosine: AdamW (--wd), linear warmup for --warmup epochs then per-step cosine
-  --fusion tf|concat|mean|gate  tf: official instance-bag transformer (--nblock, v1 = 10); concat: official POE baseline (pooled view features concatenated, no local heads);
-                           mean: average of the two knees' pooled features; gate: gated attention pooling (Ilse 2018). mean/gate add a single-knee local head shared by both knees
-  --lam_local λ            weight of the local-head losses (v1 = 1, i.e. L_global + L_R + L_L)
-  --primary local|global   readout used for early stopping and pred_age (v1 = local: mean expected age of the two knees' local heads)
-  --min_age/--num_output   POE class range (v1 = 0/100; POE-31 = 60/31)
-  --reg [--no_poe]         scalar regression (L1, target centred on the training-fold mean age); with --no_poe, direct L1 regression without POE sampling
-  --no_mirror              do not mirror the left knee to the right-knee orientation
-  --views both|R|L         single-knee model (train and predict on the right or left knee only; requires mean/gate); default both knees
-  --no_cross               transformer with self-attention only (cross-attention output set to zero; requires --fusion tf and --nblock ≥ 1)
-  --no_density             zero the official density-branch output. That branch is computed from the concatenated view features and fed into every local head, so without zeroing the "local" heads are not single-knee;
-                           there are no density labels here (λ = 0), so it is only an unsupervised two-knee bottleneck. This switch is required for the local path to see one knee only (N = 0 or self-attention only)
-  --roi_dir                ROI directory (default knee_roi, 1.15 × bone width)
-  --folds                  run only some outer folds (0,1 for screening)
-  --smoke N                smoke test: train on N participants for 1 epoch, write no outputs
-Fold assignment is fixed by --split_seed (= v1's 20260831) and decoupled from the training seed --seed (in v1 they were the same, so changing the seed also changed the folds).
-Only participants with ROIs of both knees are included (v1 duplicated single-knee participants; 0 in practice). v1's file-name filter accepted only K1 films and missed 3 participants with only K2 films (with age and mortality follow-up);
-v2 includes them while keeping the outer folds and internal validation sets of the original 4,872 participants unchanged (see the "folds" section).
-Output (appended per fold): /home/data/knee_yolo/v2/{tag}_folds.csv (fold, inner_val_mae, best_ep, stop_ep, minutes) - the only file used for screening;
-held-out folds are blinded: blind/{tag}_oof.csv (SEQN, fold, age, pred_age = primary readout, pred_global, pred_local, pred_L, pred_R) and blind/{tag}_holdout.csv (held-out MAE of each readout);
-the log does not print held-out MAE, and blind/ is not opened before the model is finalized. Smoke tests (--smoke) write to v2/smoke/.
+Defaults reproduce a direct port of the official Mammo-AGE recipe; each knee-specific change is a switch.
+The configuration used in the manuscript is in train_5fold.sh (section 1).
+  --aug official|knee      knee: no elastic/grid/optical distortion or median blur; geometry (rotation ±5°, shift ≤5%,
+                           scale 0.95-1.05, p 0.5) drawn per knee; brightness/contrast (±10%, p 0.5), gamma (0.9-1.1, p 0.3)
+                           and 3x3 Gaussian blur (p 0.15) shared by both knees of a film; Gaussian noise (SD 0.007-0.012, p 0.2)
+                           with shared strength, sampled per knee; CoarseDropout (8 holes, side 10%, p 0.2) per knee
+  --norm minmax8|pct|global  minmax8: per-image min-max to uint8; pct: per-image [P0.5, P99.5] mapped to [0,1];
+                           global: [P0.5, P99.5] of training-fold pixels mapped to [0,1]. pct and global are then
+                           standardized by the training-fold pixel mean and SD
+  --sched step|cosine      step: Adam, no weight decay, lr x0.1 at epochs 20/40/60/80; cosine: AdamW (--wd), linear warm-up
+                           for --warmup epochs, then per-step cosine decay
+  --fusion tf|concat|mean|gate  tf: Mammo-AGE instance-bag transformer (--nblock blocks); concat: Mammo-AGE POE baseline
+                           (pooled features concatenated, no local heads); mean / gate: mean or gated-attention pooling
+                           (Ilse et al. 2018) with one local head shared by both knees
+  --lam_local              weight of the local-head losses (1: L_global + L_R + L_L)
+  --primary local|global   readout used for early stopping and pred_age (local: mean expected age of the two knee heads)
+  --min_age/--num_output   POE age classes (default 0-99)
+  --reg [--no_poe]         scalar L1 regression on age centred at the training-fold mean; --no_poe drops POE sampling
+  --no_mirror              do not mirror left knees to the right-knee orientation
+  --views both|R|L         single-knee model (requires mean or gate)
+  --no_cross               transformer without cross-attention (requires --fusion tf and --nblock >= 1)
+  --no_density             zero the output of the Mammo-AGE density branch. There are no density labels here, and the
+                           branch feeds features of both knees into every local head; zeroing it is needed for a local
+                           head to see one knee only
+  --folds                  outer folds to run;  --smoke N: one epoch on N participants, no outputs
+Outer folds are set by --split_seed, independently of the training seed --seed. Participants need ROIs of both knees.
+Three participants with only a second film (K2) are assigned to folds separately, so the folds of the other participants
+do not depend on them; they are never used for internal validation.
+Outputs in /home/data/knee_yolo/v2: {tag}_folds.csv (fold, inner_val_mae, best_ep, stop_ep, minutes) and, in blind/,
+{tag}_oof.csv (held-out predictions of each readout) and {tag}_holdout.csv (held-out MAE). The log reports internal-validation
+MAE only; blind/ was not opened until all backbones had been trained.
 """
 import os, re, csv, glob, math, random, argparse, time, numpy as np, cv2
 os.environ.setdefault("N_VIEWS", "2")
@@ -55,9 +57,9 @@ ap.add_argument("--min_age", type=int, default=0); ap.add_argument("--num_output
 ap.add_argument("--reg", action="store_true"); ap.add_argument("--no_poe", action="store_true"); ap.add_argument("--no_mvl", action="store_true"); ap.add_argument("--no_sto", action="store_true")
 ap.add_argument("--no_mirror", action="store_true"); ap.add_argument("--roi_dir", default="/home/data/knee_roi"); ap.add_argument("--save_dir", default="")
 ap.add_argument("--views", default="both", choices=["both", "R", "L"]); ap.add_argument("--no_cross", action="store_true"); ap.add_argument("--no_density", action="store_true")
-# --full: train the final model on all participants and save it (10% internal validation for early stopping only, no held-out fold)
+# --full: train on all participants and save the checkpoint (10% internal validation for early stopping, no held-out fold)
 ap.add_argument("--full", action="store_true")
-# --target phenoage: supervise on this column of --label_csv; folds as for the knee age model, participants without a target dropped; target rounded and clipped to the POE class range
+# --target phenoage: train on this column of --label_csv instead of age (same folds; rounded and clipped to the POE classes)
 ap.add_argument("--target", default="age", choices=["age", "phenoage"]); ap.add_argument("--label_csv", default="/home/data/phenoage_labels.csv")
 Aa = ap.parse_args(); DEV = "cuda"; OUT = "/home/data/knee_yolo/v2"; os.makedirs(OUT, exist_ok=True)
 assert not Aa.full or Aa.save_dir, "--full requires --save_dir (the checkpoint is its only product)"
@@ -69,7 +71,7 @@ if Aa.no_cross:
     assert Aa.fusion == "tf" and Aa.nblock >= 1, "--no_cross applies only to the official transformer with N ≥ 1"
     import transformer as _T
     def _self_only(self, local_feats, global_feat):
-        """Self-attention only: zero the cross-attention output of each block (FFN input size unchanged), so the knees do not interact in the local path; otherwise as the official forward."""
+        """Instance_bag_transformer.forward with the cross-attention output set to zero, so the knees do not interact."""
         out = []
         for feat in local_feats:
             x = self.local_proj(feat); shp = x.shape
@@ -91,30 +93,30 @@ for f in sorted(glob.glob(f"{Aa.roi_dir}/*.png")):
 bags, single = {}, []
 for s, fs in films.items():
     ok = [n for n in sorted(fs) if len(fs[n]) == 2]
-    if ok: bags[s] = fs[ok[0]]                       # lowest-numbered film with both knees
+    if ok: bags[s] = fs[ok[0]]                       # first film with both knees
     else: single.append(s)
-# folds: participants with K1 films split into five folds by split_seed; K2-only participants split separately and added to training only, never to internal validation
+# outer folds: K1 participants by split_seed; K2-only participants assigned separately and kept out of internal validation
 base = sorted(s for s in bags if len(films[s].get(1, {})) == 2); bset = set(base); extra = sorted(s for s in bags if s not in bset)
 random.seed(SPLIT); random.shuffle(base); random.Random(SPLIT).shuffle(extra)
 fold_of = {s: i % 5 for i, s in enumerate(base)}; fold_of.update({s: i % 5 for i, s in enumerate(extra)})
 random.seed(Aa.seed); OFF = 0.0
-print(f"{len(bags)} participants (v1 cohort {len(base)} + K2 only {len(extra)}; excluded without bilateral ROIs {len(single)})  " + "  ".join(f"{k}={v}" for k, v in vars(Aa).items()), flush=True)
+print(f"{len(bags)} participants (K1 {len(base)} + K2 only {len(extra)}; excluded without bilateral ROIs {len(single)})  " + "  ".join(f"{k}={v}" for k, v in vars(Aa).items()), flush=True)
 AGE, raw_t = lab, {}
-if Aa.target != "age":   # folds already set on the age cohort; from here lab = training target (non-missing only)
+if Aa.target != "age":   # folds are already fixed; lab now holds the training target
     raw_t = {r["SEQN"]: float(r[Aa.target]) for r in csv.DictReader(open(Aa.label_csv)) if r[Aa.target] not in ("", "NA")}
     lo_c, hi_c = Aa.min_age, Aa.min_age + Aa.num_output - 1
     lab = {s: float(min(max(round(v), lo_c), hi_c)) for s, v in raw_t.items() if s in bags}
     print(f"target {Aa.target}: non-missing in cohort {len(lab)} / {len(bags)}; clipped to [{lo_c}, {hi_c}]: {sum(1 for s in lab if round(raw_t[s]) != lab[s])}", flush=True)
 
 def to_unit(im, par):
-    """16-bit ROI -> model grey levels. minmax8 returns uint8 (v1); pct/global return float32 [0,1]."""
+    """16-bit ROI -> grey levels: uint8 for minmax8, float32 in [0,1] for pct and global."""
     if Aa.norm == "minmax8":
         mn, mx = float(im.min()), float(im.max()); return ((im - mn) / max(mx - mn, 1.0) * 255.0).astype(np.uint8)
     lo, hi = np.percentile(im[::2, ::2], [0.5, 99.5]) if Aa.norm == "pct" else (par["lo"], par["hi"])
     return np.clip((im - lo) / max(hi - lo, 1.0), 0.0, 1.0).astype(np.float32)
 
 def fit_norm(tr, k):
-    """Estimate normalization parameters within the training fold only: fixed-seed sample of ≤400 participants (both knees), 1/64 of pixels per image."""
+    """Normalization parameters from the training fold: up to 400 participants (both knees), 1/64 of the pixels of each image."""
     if Aa.norm == "minmax8": return {"mu": 0.5, "sd": 0.5}
     pick = np.random.default_rng(SPLIT + k).choice(len(tr), min(400, len(tr)), replace=False); raw, unit = [], []
     for i in pick:
@@ -139,7 +141,7 @@ if Aa.aug == "official":
     TF_TE = A.Compose([A.Resize(S, S, interpolation=cv2.INTER_LINEAR), A.Normalize(mean=0.5, std=0.5), ToTensorV2()])
 
 def knee_aug(xs, rng):
-    """xs: float32 [0,1] images of one participant's two knees (resized to S). Photometric parameters shared; geometry, noise draws and dropout independent."""
+    """Augment the two knees of one participant (float32 in [0,1], size S): photometric parameters shared, geometry, noise and dropout drawn per knee."""
     bc = (rng.uniform(0.9, 1.1), rng.uniform(-0.1, 0.1)) if rng.random() < 0.5 else None
     gm = rng.uniform(0.9, 1.1) if rng.random() < 0.3 else None
     bl = rng.random() < 0.15
@@ -165,7 +167,7 @@ class BagDS(Dataset):
     def __len__(s): return len(s.sq)
     def __getitem__(s, i):
         sq = s.sq[i]; sides = list(VS)
-        if s.train: random.shuffle(sides)          # random view order in training, fixed in prediction
+        if s.train: random.shuffle(sides)          # random knee order in training
         ims = []
         for sd in sides:
             x = to_unit(cv2.imread(bags[sq][sd], cv2.IMREAD_ANYDEPTH).astype(np.float32), s.par)
@@ -182,7 +184,7 @@ class BagDS(Dataset):
 
 # ---------------- model ----------------
 class Head(nn.Module):
-    """POE head: emd/var/drop/final as in the official POE_Baselie_Model (without the unlabelled density branch)."""
+    """POE head as in Mammo-AGE POE_Baselie_Model, without the density branch."""
     def __init__(s, din, nout):
         super().__init__()
         s.emd = nn.Sequential(nn.Linear(din, din), nn.ReLU(True)); s.var = nn.Sequential(nn.Linear(din, din), nn.BatchNorm1d(din, eps=0.001, affine=False))
@@ -200,7 +202,7 @@ class NoTF(nn.Module):
     def forward(s, x, max_t=50, use_sto=False): g, ge, glv, d = s.m(x, max_t, use_sto); return g, [], ge, [], glv, [], d
 
 class Fuse(nn.Module):
-    """mean / gate: backbone shared by both knees -> pooled features f_v; global = fused features -> latent -> global POE head; local = each f_v -> shared local POE head."""
+    """mean / gate fusion: shared backbone; global head on the pooled features of both knees, shared local head on each knee."""
     def __init__(s, nout, mode):
         super().__init__(); base = POE_Baselie_Model(Aa.arch, nout, backbone_model=True); s.trunk = base.model; C = base.num_feat
         s.mode = mode; s.avg = nn.AdaptiveAvgPool2d(1)
@@ -215,13 +217,13 @@ class Fuse(nn.Module):
         return g, [l[0] for l in L], ge, [l[1] for l in L], glv, [l[2] for l in L], None
 
 class Zero4(nn.Module):
-    """Replaces the unlabelled density branch with an all-zero 4-d output. The official POE_Baselie_Model still concatenates it into latent and Mammo_AGE into each local head, but it carries no information."""
+    """All-zero replacement for the density branch output (4 values), which Mammo-AGE still concatenates into the heads."""
     def forward(s, x): return x.new_zeros(x.shape[0], 4)
 
 def build():
     nout = 1 if Aa.reg else Aa.num_output
     m = Mammo_AGE(arch=Aa.arch, num_output=nout, nblock=Aa.nblock, hidden_size=Aa.hidden) if Aa.fusion == "tf" else NoTF(nout) if Aa.fusion == "concat" else Fuse(nout, Aa.fusion)
-    if Aa.no_density:   # no density labels; zeroing makes the local heads see one knee only (the branch mixes in the other knee)
+    if Aa.no_density:
         for mod in list(m.modules()):
             if isinstance(mod, POE_Baselie_Model): mod.predict_density = Zero4()
     c1 = ProbOrdiLoss(distance="JDistance", alpha_coeff=(0. if Aa.no_poe else 1e-5), beta_coeff=(0. if Aa.no_poe else 1e-4), margin=5,
@@ -236,13 +238,13 @@ def compute_loss(pred, emb, lv, age, crit):
     return pol + c2(p_, a_)
 
 def readouts(g, loc, age):
-    """Expected age of each head (min_age subtracted): global, mean of the two local heads, each knee."""
+    """Expected age (minus min_age) from the global head, the mean of the local heads, and each local head."""
     f = (lambda o: cal_mae_acc_reg(o, age, use_sto)["pred_age"]) if Aa.reg else (lambda o: cal_mae_acc_cls(o, age, use_sto)["pred_age"])
     pg = np.asarray(f(g), float); pv = [np.asarray(f(l), float) for l in loc]
     return pg, (np.mean(pv, 0) if pv else pg), pv
 
 def train_step(m, b, crit):
-    """Target = age − min_age − OFF (OFF is the training-fold mean age, for regression only, so the output layer need not climb from 0 to 70+)."""
+    """Target = age - min_age - OFF; OFF is the training-fold mean age for --reg and 0 otherwise."""
     img = b["img"].to(DEV, non_blocking=True); age = b["age"].to(DEV) - Aa.min_age - OFF
     g, loc, ge, le, glv, llv, _ = m(img, max_t=Aa.max_t, use_sto=use_sto)
     loss = compute_loss(g, ge, glv, age, crit)
@@ -257,26 +259,26 @@ def predict(m, sq, par):
             img = b["img"].to(DEV, non_blocking=True); age = b["age"].to(DEV) - sh
             g, loc, *_ = m(img, max_t=Aa.max_t, use_sto=use_sto); pg, pl, pv = readouts(g, loc, age); n = len(pg)
             out["pred_global"] += list(pg + sh); out["pred_local"] += list(pl + sh)
-            for sd in ("L", "R"):                      # view order fixed to VS in prediction
+            for sd in ("L", "R"):
                 out[f"pred_{sd}"] += list(pv[VS.index(sd)] + sh) if (pv and sd in VS) else [np.nan] * n
     out = {c: np.array(v, dtype=float) for c, v in out.items()}
     out["pred_age"] = out["pred_local"] if Aa.primary == "local" else out["pred_global"]
     return out
 
 # ---------------- training ----------------
-# held-out folds blinded: the log reports internal validation MAE only; held-out predictions go to blind/, not opened before the model is finalized
+# held-out predictions go to blind/; the log reports internal-validation MAE only
 ROOT = f"{OUT}/smoke" if Aa.smoke else OUT; BL = f"{ROOT}/blind"; os.makedirs(BL, exist_ok=True)
 FO, FF, FH = f"{BL}/{Aa.tag}_oof.csv", f"{ROOT}/{Aa.tag}_folds.csv", f"{BL}/{Aa.tag}_holdout.csv"
 for p in (FO, FF, FH):
     if os.path.exists(p): (os.remove(p) if Aa.smoke else os.rename(p, f"{p}.bak{int(time.time())}"))
 t0 = time.time()
 for k in ([5] if Aa.full else [int(x) for x in Aa.folds.split(",")]):
-    if Aa.full:     # final model: k = 5 used only as the seed, no held-out fold
+    if Aa.full:     # k = 5 only seeds the internal-validation split
         tr_all = list(base); te = []
     else:
         tr_all = [s for s in base if fold_of[s] != k]; te = [s for s in base + extra if fold_of[s] == k]
     rng = random.Random(SPLIT + k); rng.shuffle(tr_all); nv = len(tr_all) // 10; va = tr_all[:nv]; tr = tr_all[nv:] + [s for s in extra if Aa.full or fold_of[s] != k]
-    if Aa.target != "age": tr, va, te = [s for s in tr if s in lab], [s for s in va if s in lab], [s for s in te if s in lab]   # drop participants without a target after splitting
+    if Aa.target != "age": tr, va, te = [s for s in tr if s in lab], [s for s in va if s in lab], [s for s in te if s in lab]   # after splitting
     if Aa.smoke: tr, va, te = tr[:Aa.smoke], va[:2 * Aa.bs], te[:2 * Aa.bs]
     OFF = float(np.mean([lab[s] for s in tr])) - Aa.min_age if Aa.reg else 0.0
     par = fit_norm(tr, k); m, crit = build()
@@ -305,7 +307,7 @@ for k in ([5] if Aa.full else [int(x) for x in Aa.folds.split(",")]):
                     "inner_val_mae": best, "best_ep": best_ep, "stop_ep": ep, "n_train": len(tr), "val_seqn": va,
                     "note": "knee age v2 final model: all participants (10% internal validation for early stopping only), no held-out; "
                             "prediction = mean of the two knee-level expected ages; use ensemble weights and bias-correction coefficients calibrated on the five-fold out-of-fold predictions"}, ck)
-        # read-back check (POE inference samples randomly; both passes use the same fixed seed)
+        # reload the checkpoint and check that predictions agree (same seed for the stochastic POE sampling)
         torch.manual_seed(12345); P1 = predict(m, va, par)
         m2, _ = build(); m2.load_state_dict(torch.load(ck, map_location=DEV)["state_dict"]); torch.manual_seed(12345); P2 = predict(m2, va, par)
         dmax = float(np.nanmax(np.abs(P1["pred_age"] - P2["pred_age"])))
@@ -328,7 +330,7 @@ for k in ([5] if Aa.full else [int(x) for x in Aa.folds.split(",")]):
     new = not os.path.exists(FO)
     with open(FO, "a", newline="") as fh:
         w = csv.writer(fh, lineterminator="\n")
-        tx = Aa.target != "age"   # non-age target: also record the raw and the training (rounded, clipped) target
+        tx = Aa.target != "age"   # also record the raw and the rounded, clipped target
         if new: w.writerow(["SEQN", "fold", "age"] + (["target_raw", "target"] if tx else []) + ["pred_age", "pred_global", "pred_local", "pred_L", "pred_R"])
         for i, s in enumerate(te): w.writerow([s, k, AGE[s]] + ([raw_t[s], lab[s]] if tx else []) + [round(float(P[c][i]), 4) for c in ("pred_age", "pred_global", "pred_local", "pred_L", "pred_R")])
     for path, r in ((FF, row), (FH, hrow)):

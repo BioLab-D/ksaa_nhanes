@@ -1,13 +1,9 @@
-"""Rotation rescue: rotate films with failed detection by 90° and re-run detection.
+"""Rotate films without a valid detection by +-90 degrees and run the detector again.
 
-Review images showed that rotation is by far the main cause of failure. The original QC flagged only 2 films as "rotated" because
-the criterion required both knees to be detected - but the detector finds no box at all on rotated films (the training set is all
-upright films), so they fall into none. The true number of rotated films is far higher than QC reported.
-
-These films cannot simply be discarded: review images include total knee replacements, and systematic exclusion would create
-selection bias directly related to skeletal health.
-
-Both directions are tried; the one with exactly one right and one left knee side by side and the higher mean confidence is kept.
+Rotation was the main cause of failed detection: the detector, trained on upright films, finds no knee on rotated ones.
+These films are kept rather than excluded because they include knee replacements, and excluding them would bias the
+sample with respect to skeletal health. The direction with exactly one right and one left knee side by side and the
+higher mean confidence is kept.
 """
 import os, csv, numpy as np
 from PIL import Image
@@ -27,7 +23,7 @@ def try_one(img):
     if (cls==0).sum() != 1 or (cls==1).sum() != 1: return None
     pR, pL = xywh[cls==0][0], xywh[cls==1][0]
     if abs(pR[0]-pL[0]) < abs(pR[1]-pL[1]): return None      # still stacked vertically
-    if pR[0] > pL[0]: return None                            # the right knee should be on the left of the image
+    if pR[0] > pL[0]: return None                            # the participant's right knee is on the image left
     return float(cf.mean()), cls, xywh, rr.orig_shape
 
 out = []

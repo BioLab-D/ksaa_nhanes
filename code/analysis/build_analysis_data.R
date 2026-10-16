@@ -1,18 +1,17 @@
-# Build the unified analysis data set analysis_data.rds (part 1) and write the PhenoAge recomputed in this cohort back to work/oof_pheno.rds (part 2).
-.fresh_rng <- function() { RNGkind("default", "default", "default")   # reset the RNG to the state of a fresh R session at the start of each part
+# Build the analysis data set (analysis_data.rds) and update work/oof_pheno.rds with Phenotypic Age recomputed in this cohort.
+# Input: results/ksaa_oof.csv, results/predictions/m4_*.csv, results/work/*.csv and the NHANES III DuckDB
+# Output: results/analysis/analysis_data.rds, results/work/oof_pheno.rds
+.fresh_rng <- function() { RNGkind("default", "default", "default")   # each part starts from a fresh-session RNG state
   if (exists(".Random.seed", envir = globalenv())) rm(".Random.seed", envir = globalenv()) }
 
-# ======== Unified analysis data set (analysis_data.rds): primary cohort of 4,875 + outcomes, PhenoAge, covariates, K–L, BMD, function and left/right knee readouts ========
+# ======== Part 1: analysis_data.rds (4,875 participants: outcomes, PhenoAge, covariates, K–L, BMD, function, per-knee readouts) ========
 .fresh_rng(); local({
-# Unified analysis data set (analysis_data.rds): primary cohort of 4,875 + outcomes, PhenoAge, covariates, K–L, BMD, function and left/right knee readouts
-# PhenoAge is recomputed in this cohort.
-# Run by run_all.sh
 suppressMessages(library(duckdb))
 res <- here::here("results"); sp <- file.path(res, "work"); out <- file.path(res, "analysis")
 dir.create(out, showWarnings = FALSE)
 q <- function(x){ x <- suppressWarnings(as.numeric(x)); for(k in 1:6){ s8 <- as.numeric(strrep("8", k)); lo <- x[!is.na(x) & x < s8]
-  if(any(x == s8, na.rm = TRUE) && length(lo) && s8 >= max(lo) * 1.5) x[x == s8] <- NA }; x }   # all-8s treated as a sentinel only when far above the other values
-na_at <- function(x, codes) { x <- as.numeric(x); x[x %in% codes] <- NA; x }                      # sentinels given explicitly according to field width
+  if(any(x == s8, na.rm = TRUE) && length(lo) && s8 >= max(lo) * 1.5) x[x == s8] <- NA }; x }   # all-8 code is treated as missing only when far above the other values
+na_at <- function(x, codes) { x <- as.numeric(x); x[x %in% codes] <- NA; x }                      # missing codes given explicitly
 yn <- function(x) ifelse(x == 1, 1L, ifelse(x == 2, 0L, NA_integer_))                               # 1 = yes, 2 = no, 8/9 = missing
 prev <- function(v) sprintf("%-10s n %4d  missing %4d  positive %5.1f%%", v, sum(!is.na(d[[v]])), sum(is.na(d[[v]])), 100 * mean(d[[v]], na.rm = TRUE))
 
@@ -21,7 +20,7 @@ d <- read.csv(file.path(res, "ksaa_oof.csv"))
 sl <- read.csv(file.path(res, "work", "surv_labels.csv")); i <- match(d$SEQN, sl$SEQN); stopifnot(!anyNA(i), all(d$age == sl$age[i]))
 for(v in c("sex", "race", "phase", "pir", "bmi", "fnbmd", "WTPFEX6", "WTPFEX2", "SDPPSU6", "SDPSTRA6", "SDPPSU2", "SDPSTRA2")) d[[v]] <- sl[[v]][i]
 d$t <- sl$PERMTH_EXM[i]; d$e <- sl$MORTSTAT[i]; d$ucod <- sl$UCOD_LEADING[i]; d$gap <- d$gap_corr   # time zero = MEC examination (PERMTH_EXM)
-d$e_cvd <- as.integer(d$e == 1 & d$ucod %in% c(1, 5)); d$e_cancer <- as.integer(d$e == 1 & d$ucod %in% 2)   # NCHS groups: 1 heart disease, 5 cerebrovascular, 2 malignant neoplasms; the 5 deaths without a cause are 0 for both
+d$e_cvd <- as.integer(d$e == 1 & d$ucod %in% c(1, 5)); d$e_cancer <- as.integer(d$e == 1 & d$ucod %in% 2)   # UCOD_LEADING: 1 heart disease, 5 cerebrovascular, 2 cancer; the 5 deaths without a cause count as neither
 cat(sprintf("Cohort n %d; deaths %d (no cause %d); CVD deaths %d; cancer deaths %d\n", nrow(d), sum(d$e), sum(d$e == 1 & is.na(d$ucod)), sum(d$e_cvd), sum(d$e_cancer)))
 cat(sprintf("surv_labels bmi range %s, fnbmd range %s (confirm cleaned)\n", paste(range(d$bmi, na.rm = TRUE), collapse = "–"), paste(round(range(d$fnbmd, na.rm = TRUE), 3), collapse = "–")))
 
@@ -45,10 +44,10 @@ pheno <- function(x, use_crp = TRUE){
     0.3306 * x$RWP + 0.00188 * x$APPSI + 0.0554 * x$WCP + 0.0804 * x$age
   if(use_crp) xb <- xb + 0.0954 * log(x$CRP)
   g <- 0.0076927; k <- (exp(120 * g) - 1) / g
-  141.50225 + (log(0.00553 * k) + xb) / 0.09165   # log(1 − M) simplified analytically to −exp(xb)·k to avoid floating-point overflow
+  141.50225 + (log(0.00553 * k) + xb) / 0.09165   # log(1 - M) = -exp(xb) * k, written this way to avoid overflow
 }
 d$phenoage <- pheno(d); d$pa_accel <- resid(lm(phenoage ~ age, d, na.action = na.exclude))
-# PhenoAge acceleration winsorized at the 1st/99th percentiles for all analyses (very long right tail); the raw value pa_accel_raw is for descriptive tables only.
+# PhenoAge acceleration is winsorized at the 1st/99th percentiles (long right tail); pa_accel_raw is kept for descriptive tables
 d$pa_accel_raw <- d$pa_accel
 PA_W <- quantile(d$pa_accel_raw, c(.01, .99), na.rm = TRUE)
 d$pa_accel <- pmin(pmax(d$pa_accel_raw, PA_W[1]), PA_W[2])
@@ -63,11 +62,12 @@ ed <- na_at(AD$HFA8R, c(88, 99)); d$edu3 <- cut(ed, c(-Inf, 11, 12, Inf), labels
 d$smk3 <- factor(ifelse(AD$HAR1 == 2, "never", ifelse(AD$HAR1 == 1 & AD$HAR3 == 2, "former", ifelse(AD$HAR1 == 1 & AD$HAR3 == 1, "current", NA))), levels = c("never", "former", "current"))
 # Alcohol: <12 drinks in lifetime = never; >=12 in lifetime but <12 in the past year = former/light (includes current light drinkers); >=12 in the past year = current
 d$alc3 <- factor(ifelse(EX$MAPE1 == 2, "never", ifelse(EX$MAPE1 == 1 & EX$MAPE2 == 2, "former_light", ifelse(EX$MAPE1 == 1 & EX$MAPE2 == 1, "current", NA))), levels = c("never", "former_light", "current"))
-# Leisure-time physical activity: times per activity in the past month × MET; moderate 3–5.9, vigorous >=6. Active = moderate >=20/month (~5/week) or vigorous >=12/month (~3/week); inactive = none
+# Leisure-time physical activity: sessions in the past month x MET; moderate 3-5.9, vigorous >= 6.
+# Active = moderate >= 20/month (~5/week) or vigorous >= 12/month (~3/week); inactive = none
 bad <- rep(FALSE, nrow(d)); mod <- vig <- tot <- mets <- rep(0, nrow(d)); nomet <- 0
 for(p in PA){ f <- as.numeric(AD[[p[1]]]); m <- as.numeric(AD[[p[2]]]); gate <- if(is.na(p[3])) rep(1, nrow(d)) else as.numeric(AD[[p[3]]])
   bad <- bad | (!is.na(f) & f >= 7777) | (!is.na(gate) & gate %in% c(8, 9)); f[is.na(f) | f >= 7777] <- 0
-  bad <- bad | (f > 0 & !is.na(m) & m >= 88); m[!is.na(m) & m >= 88] <- NA   # HAT19MET has an 8888 sentinel (3 people): intensity unknown, activity set to missing
+  bad <- bad | (f > 0 & !is.na(m) & m >= 88); m[!is.na(m) & m >= 88] <- NA   # HAT19MET = 8888 (3 people): intensity unknown, set to missing
   nomet <- nomet + sum(f > 0 & is.na(m)); m[is.na(m)] <- 3
   tot <- tot + f; mets <- mets + f * m; mod <- mod + f * (m >= 3 & m < 6); vig <- vig + f * (m >= 6) }
 d$pa_sessions <- ifelse(bad, NA, tot); d$pa_metsess <- ifelse(bad, NA, mets)
@@ -80,16 +80,17 @@ d$tc <- na_at(LB$TCP, 888); d$hdl <- na_at(LB$HDP, 888); d$tg <- na_at(LB$TGP, 8
 or1 <- function(...) { m <- cbind(...); ifelse(rowSums(m == 1, na.rm = TRUE) > 0, 1L, ifelse(rowSums(is.na(m)) == 0, 0L, NA_integer_)) }
 d$htn <- or1(yn(AD$HAE2), as.integer(d$sbp >= 140), as.integer(d$dbp >= 90))                       # self-reported physician diagnosis or measured >=140/90
 d$dm <- or1(yn(AD$HAD1), as.integer(d$hba1c >= 6.5))                                               # self-report or HbA1c >=6.5%
-d$dm[is.na(d$dm) & AD$HAD1 == 2 & is.na(d$hba1c)] <- 0L                                            # self-reported no and HbA1c missing: 0 by self-report, not missing
-bpmed <- ifelse(AD$HAE2 == 2 & is.na(AD$HAE5A), 0L, yn(AD$HAE5A))                                   # HAE5A asked only of those reporting hypertension; not asked = no medication
+d$dm[is.na(d$dm) & AD$HAD1 == 2 & is.na(d$hba1c)] <- 0L                                            # self-reported no with HbA1c missing -> 0
+bpmed <- ifelse(AD$HAE2 == 2 & is.na(AD$HAE5A), 0L, yn(AD$HAE5A))                                   # HAE5A is asked only of those reporting hypertension
 d$dyslip <- or1(as.integer(d$tc >= 240), as.integer(d$hdl < 40))
 d$cvd_hist <- or1(yn(AD$HAF10), yn(AD$HAC1C), yn(AD$HAC1D))                                        # myocardial infarction, heart failure, stroke
 d$cancer_hist <- yn(AD$HAC1O)                                                                       # non-skin cancer ("other cancer")
 d$arth <- yn(AD$HAC1A); d$obese <- as.integer(d$bmi >= 30)
-# eGFR: NHANES III creatinine calibrated to the standardized method (0.960 × Scr − 0.184; Selvin 2007) [verify], then CKD-EPI 2021 (no race term)
+# eGFR: NHANES III creatinine calibrated to the standardized method (0.960 x Scr - 0.184; Selvin 2007), then CKD-EPI 2021 (no race term)
 scr <- 0.960 * d$CEP - 0.184; fem <- d$sex == 2; kap <- ifelse(fem, 0.7, 0.9); alp <- ifelse(fem, -0.241, -0.302)
 d$egfr <- 142 * pmin(scr / kap, 1)^alp * pmax(scr / kap, 1)^-1.200 * 0.9938^d$age * ifelse(fem, 1.012, 1)
-# Metabolic syndrome (>=3 of 5 ATP III criteria): fasting >=8 h uses TG >=150 and fasting glucose >=100; non-fasting uses TG >=175 and HbA1c >=5.7; diabetes and BP medication count toward their criteria
+# Metabolic syndrome (>= 3 of 5 ATP III criteria). Fasted >= 8 h: TG >= 150 and glucose >= 100; otherwise TG >= 175 and HbA1c >= 5.7.
+# Diabetes and BP medication count toward their criteria
 fasting <- !is.na(d$fast_h) & d$fast_h >= 8
 cr <- cbind(waist = as.integer(ifelse(fem, d$waist > 88, d$waist > 102)),
             tg    = as.integer(ifelse(fasting, d$tg >= 150, d$tg >= 175)),
@@ -97,7 +98,7 @@ cr <- cbind(waist = as.integer(ifelse(fem, d$waist > 88, d$waist > 102)),
             bp    = or1(as.integer(d$sbp >= 130), as.integer(d$dbp >= 85), bpmed),
             glu   = or1(d$dm, as.integer(ifelse(fasting, d$SGP >= 100, d$hba1c >= 5.7))))
 nmet <- rowSums(cr == 1, na.rm = TRUE); nmis <- rowSums(is.na(cr)); d$mets <- ifelse(nmet >= 3, 1L, ifelse(nmet + nmis < 3, 0L, NA_integer_))
-# Insulin resistance: fasting >=8 h, not using insulin; HOMA-IR = G1P (mg/dL) × I1P (μU/mL) / 405; sentinels G1P 88888, I1P 888888
+# HOMA-IR = G1P (mg/dL) x I1P (uU/mL) / 405, in those fasted >= 8 h and not using insulin; missing codes G1P 88888, I1P 888888
 d$fpg <- na_at(LB$G1P, 88888); d$insulin <- na_at(LB$I1P, 888888); ins <- (yn(AD$HAD6) %in% 1L) | (LB$PHPINSU %in% 1)
 d$lhoma <- ifelse(fasting & !ins, log(d$fpg * d$insulin / 405), NA); d$linsulin <- ifelse(fasting & !ins, log(d$insulin), NA)
 cat(sprintf("HOMA-IR: fasting >=8 h, no insulin and both values valid %d (insulin users %d); PHPINSU values %s; median HOMA-IR %.2f\n", sum(!is.na(d$lhoma)), sum(ins),
@@ -125,8 +126,8 @@ hh <- sapply(c("HAH1", "HAH2", "HAH8", "HAH9"), function(v) { x <- P[[v]][jp]; a
 d$anylimit <- as.integer(rowSums(hh, na.rm = TRUE) > 0); d$anylimit[rowSums(!is.na(hh)) == 0] <- NA
 d$poor <- as.integer(d$pir < 1)
 
-# ---------------- Left/right knee readouts: knee-level local heads of the same bilateral model, with the primary readout's within-fold weights and out-of-fold bias correction ----------------
-# Note: the local heads carry information from the other knee (cross-attention), so gap_L / gap_R are not independent single-knee estimates
+# ---------------- Left/right knee readouts (local heads of the bilateral model; same fold weights and bias correction) ----------------
+# The local heads also see the other knee through cross-attention, so gap_L / gap_R are not independent single-knee estimates
 A5 <- c(resnet18 = "resnet18", resnet50 = "resnet50", efficientnetb0 = "efficientnetb0", convnexttiny = "convnexttiny", densenet121 = "densenet121")
 FM <- sapply(A5, function(a) read.csv(file.path(res, "predictions", sprintf("m4_%s_folds.csv", a)))$inner_val_mae); W <- apply(FM, 1, function(m) (1/m) / sum(1/m))
 for(sd_ in c("L", "R")){
@@ -134,7 +135,7 @@ for(sd_ in c("L", "R")){
   raw <- rep(NA_real_, nrow(d)); for(k in 0:4){ i <- d$fold == k; raw[i] <- as.numeric(M[i, , drop = FALSE] %*% W[, k + 1]) }
   g <- rep(NA_real_, nrow(d)); for(k in 0:4){ te <- d$fold == k; f <- lm(I(raw - age) ~ age, data.frame(raw = raw[!te], age = d$age[!te])); g[te] <- raw[te] - d$age[te] - predict(f, data.frame(age = d$age[te])) }
   d[[paste0("gap_", sd_)]] <- g }
-# Check: the mean of the two knee readouts, through the same pipeline, should be close to the primary readout
+# check: the mean of the two knee readouts should be close to the primary readout
 M <- sapply(A5, function(a){ x <- read.csv(file.path(res, "predictions", sprintf("m4_%s_oof.csv", a))); x$pred_age[match(d$SEQN, x$SEQN)] })
 raw <- rep(NA_real_, nrow(d)); for(k in 0:4){ i <- d$fold == k; raw[i] <- as.numeric(M[i, , drop = FALSE] %*% W[, k + 1]) }
 cat(sprintf("\nRebuilt primary raw prediction vs ksaa_oof.csv max difference %.2e; correlation of left/right knee gap with primary gap %.3f / %.3f; left-right correlation %.3f\n",
@@ -154,15 +155,14 @@ cat(sprintf("  inactive vs other %.2f; current drinking vs other %.2f; current s
 saveRDS(d, file.path(out, "analysis_data.rds")); cat(sprintf("\n-> %s (%d × %d)\n", file.path(out, "analysis_data.rds"), nrow(d), ncol(d)))
 })
 
-# ======== Overwrite work/oof_pheno.rds with the PhenoAge recomputed in this cohort (4,875; part 1) for downstream use by SEQN; the original is backed up as oof_pheno_v1cohort4872.rds. ========
+# ======== Part 2: replace work/oof_pheno.rds with the PhenoAge values from part 1 (original kept as oof_pheno_v1cohort4872.rds) ========
 .fresh_rng(); local({
-# Overwrite work/oof_pheno.rds with the PhenoAge recomputed in this cohort (4,875; part 1) for downstream use by SEQN; the original is backed up as oof_pheno_v1cohort4872.rds.
-# Downstream uses only SEQN, phenoage and pa_accel (taken as the first column whose name contains "accel", which must be pa_accel); other columns are kept by SEQN.
+# Downstream scripts use SEQN, phenoage and pa_accel (the first column containing "accel"); other columns are carried over by SEQN.
 res <- here::here("results"); sp <- file.path(res, "work")
 bk <- file.path(sp, "oof_pheno_v1cohort4872.rds"); old <- readRDS(file.path(sp, "oof_pheno.rds"))
 if (!file.exists(bk)) { stopifnot(nrow(old) == 4872); saveRDS(old, bk); cat("backup ->", bk, "\n") } else old <- readRDS(bk)
 v <- readRDS(file.path(res, "analysis", "analysis_data.rds"))
-# pa_accel is the 1/99 winsorized value (for analyses), pa_accel_raw the raw value (for description)
+# pa_accel: winsorized (analyses); pa_accel_raw: raw (descriptive tables)
 new <- data.frame(SEQN = v$SEQN, phenoage = v$phenoage, pa_accel = v$pa_accel, zpa = as.numeric(scale(v$pa_accel)), pa_accel_raw = v$pa_accel_raw)
 keep <- setdiff(names(old), c("phenoage", "pa_accel", "zpa", "phenoage_nc", "znc", "pa_accel_raw"))
 new <- merge(new, old[, keep, drop = FALSE], by = "SEQN", all.x = TRUE)

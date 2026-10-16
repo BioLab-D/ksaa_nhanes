@@ -1,16 +1,18 @@
-# Figure 1: study workflow (A), cross-fitting and age distribution (B), age prediction performance (C), all-cause mortality (D), joint stratification with Phenotypic Age acceleration (E), phenome-wide scan (F).
-# Input: results/analysis/* (mortality results are the survey-weighted weighted/*; run weighted.R / weighted_boot.R first), results/predictions/m4_<backbone>_oof.csv, code/analysis/phewas_labels.R, example knee ROIs
-# Output: results/figures/Figure1/Figure1.{png,pdf,tiff} (183 × 166.5 mm) and panel PDFs in panels/; run from the repository root
+# Figure 1: study workflow (A), cross-fitting and age distribution (B), age prediction performance (C), all-cause mortality (D),
+#   joint stratification with Phenotypic Age acceleration (E), phenome-wide scan (F).
+# Input: results/analysis/* (survey-weighted mortality results in weighted/, from weighted.R and weighted_boot.R),
+#   results/predictions/m4_<backbone>_oof.csv, code/analysis/phewas_labels.R, example knee ROIs
+# Output: results/figures/Figure1/Figure1.{png,pdf,tiff} (183 x 166.5 mm) and panel PDFs in panels/
 suppressPackageStartupMessages({library(grid); library(ggplot2); library(survival); library(ggrepel)})
 source("code/analysis/phewas_labels.R")
 out <- "results/figures/Figure1"; dir.create(out, recursive = TRUE, showWarnings = FALSE)
 d <- readRDS("results/analysis/analysis_data.rds")
 stopifnot(nrow(d) == 4875, !anyDuplicated(d$SEQN), sum(d$e) == 4399)
 
-# ---------------- Numbers (all computed from the data and checked against the manuscript) ----------------
+# ---------------- Numbers shown in the figure (computed from the data; assertions check the manuscript values) ----------------
 PF <- do.call(rbind, lapply(split(d, d$fold), function(z) data.frame(MAE = mean(abs(z$pred_raw - z$age)), r = cor(z$age, z$pred_raw))))
 stopifnot(round(mean(PF$MAE), 2) == 4.37, round(mean(PF$r), 3) == 0.736)
-# out-of-fold raw predictions of the five backbones (same basis as the ensemble pred_raw: no age-bias correction)
+# out-of-fold raw predictions of the five backbones (no age-bias correction, like the ensemble pred_raw)
 MODS <- c(ensemble = "Weighted ensemble", resnet18 = "ResNet-18", resnet50 = "ResNet-50", densenet121 = "DenseNet-121",
           efficientnetb0 = "EfficientNet-B0", convnexttiny = "ConvNeXt-Tiny")
 PR <- sapply(names(MODS)[-1], function(a) { x <- read.csv(sprintf("results/predictions/m4_%s_oof.csv", a)); x$pred_age[match(d$SEQN, x$SEQN)] })
@@ -78,7 +80,7 @@ plot_at <- function(p, x, y, w, h) print(p, vp = viewport(x = unit(x, "mm"), y =
 align_y <- function(p1, p2) { g1 <- ggplotGrob(p1); g2 <- ggplotGrob(p2); stopifnot(ncol(g1) == ncol(g2)); pl <- g1$layout[g1$layout$name == "panel", ]
   side <- setdiff(seq_len(ncol(g1)), pl$l:pl$r); mw <- grid::unit.pmax(g1$widths[side], g2$widths[side]); g1$widths[side] <- mw; g2$widths[side] <- mw; list(g1, g2) }
 grob_at <- function(g, x, y, w, h) { pushViewport(viewport(x = unit(x, "mm"), y = unit(H - y, "mm"), width = unit(w, "mm"), height = unit(h, "mm"), just = c("left", "top"))); grid.draw(g); popViewport() }
-# draw a ggplot so the bottom of the panel (the x-axis line) falls exactly at yaxis; returns the viewport height (mm)
+# draw a ggplot so the bottom of the panel (the x-axis line) falls at yaxis; returns the viewport height (mm)
 plot_axis_at <- function(p, x, ytop, w, yaxis) { g <- ggplotGrob(p); pr <- g$layout[g$layout$name == "panel", ]
   hB <- sum(convertHeight(g$heights[(pr$b + 1):length(g$heights)], "mm", valueOnly = TRUE)); h <- yaxis - ytop + hB
   pushViewport(viewport(x = unit(x, "mm"), y = unit(H - ytop, "mm"), width = unit(w, "mm"), height = unit(h, "mm"), just = c("left", "top"))); grid.draw(g); popViewport(); invisible(h) }
@@ -88,8 +90,10 @@ th <- theme_classic(base_size = 6, base_family = "Arial") +
         plot.margin = margin(1, 2, 1, 1), plot.background = element_blank(), panel.background = element_blank(), legend.position = "none")
 
 # ---------------- Panels ----------------
-# B right: distribution of chronological age (age on the y axis, 5-year histogram bars + kernel density). NHANES III top-codes age at 90: ages >=90 form one bar, drawn at 90–95 and labeled "90+".
-# kernel density: points at a + 0.5, bandwidth 2.5 years, reflected at the inclusion limit of 60 years (otherwise the curve falsely narrows at 60); multiplied by 5 to give counts per 5 years, on the same scale as the bars
+# B right: distribution of chronological age (y axis), 5-year bars plus kernel density. NHANES III top-codes age at 90,
+#   so ages >= 90 form one bar drawn at 90-95 and labeled "90+".
+# Kernel density at a + 0.5, bandwidth 2.5 years, reflected at the 60-year inclusion limit (otherwise it dips at 60);
+#   multiplied by 5 to give counts per 5 years, on the scale of the bars
 AG <- data.frame(lo = seq(60, 90, 5)); AG$Freq <- sapply(AG$lo, function(l) sum(d$age >= l & (d$age < l + 5 | l == 90)))
 stopifnot(sum(AG$Freq) == nrow(d), range(d$age) == c(60, 90), AG$Freq[7] == sum(d$age >= 90), AG$Freq[1] == sum(d$age <= 64))
 XM <- ceiling(max(AG$Freq) / 200) * 200; stopifnot(round(mean(d$age), 1) == 71.8, round(sd(d$age), 1) == 8.1)
@@ -102,7 +106,7 @@ p_age <- ggplot(AG) + geom_rect(aes(xmin = 0, xmax = Freq, ymin = lo + .12, ymax
   annotate("text", x = XM, y = 93.3, label = sprintf("n = %s\nMean (SD), %.1f (%.1f) years", cm(nrow(d)), mean(d$age), sd(d$age)), hjust = 1, vjust = 0,
            size = 4.4 / .pt, family = "Arial", colour = C$muted, lineheight = 1) +
   scale_x_continuous(breaks = seq(0, XM, 500), labels = cm, limits = c(0, XM), expand = expansion(mult = c(0, .02))) +
-  scale_y_reverse(breaks = seq(60, 90, 10), labels = c(60, 70, 80, "90+"), limits = c(95, 60), expand = c(0, 0)) +  # panel spans exactly 60–95
+  scale_y_reverse(breaks = seq(60, 90, 10), labels = c(60, 70, 80, "90+"), limits = c(95, 60), expand = c(0, 0)) +  # panel spans 60-95
   labs(x = "Number of participants", y = "Chronological age\n(years)") + th + theme(axis.title.y = element_text(lineheight = .95))  # y-axis title on two lines
 # C top: scatter + fitted line; r and MAE are means ± SD over the five held-out folds
 fit <- coef(lm(pred_raw ~ age, d))
@@ -119,7 +123,8 @@ p_sc <- ggplot(d, aes(age, pred_raw)) + geom_point(size = .18, alpha = .16, colo
   scale_x_continuous(breaks = seq(60, 90, 10), labels = c(60, 70, 80, "90+")) + scale_y_continuous(breaks = seq(50, 90, 10)) +
   coord_cartesian(xlim = c(59.5, 90.5), ylim = c(48, 96), expand = FALSE) +
   labs(x = "Chronological age (years)", y = "Predicted knee age\n(years)") + th + theme(axis.title.y = element_text(lineheight = .95))
-# C bottom: cumulative score CS(x) = percentage with absolute error <= x years (pooled out-of-fold predictions); the ensemble CS5 (fold mean ± SD) is marked at x = 5
+# C bottom: cumulative score CS(x), the percentage with absolute error <= x years (pooled out-of-fold predictions);
+#   the ensemble CS5 (fold mean ± SD) is marked at x = 5
 XS <- seq(0, 16, .1)
 CSD <- do.call(rbind, lapply(names(MODS), function(m) { e <- abs(PR[, m] - d$age); data.frame(model = MODS[[m]], x = XS, cs = 100 * sapply(XS, function(x) mean(e <= x))) }))
 CSD$model <- factor(CSD$model, unname(MODS)); CSD <- CSD[order(CSD$model != MODS[["ensemble"]], decreasing = TRUE), ]
@@ -160,7 +165,8 @@ p_km <- ggplot(STD, aes(time, allcause, colour = q)) + geom_step(linewidth = .45
   labs(x = "Years since examination", y = "Standardized cumulative mortality") + th + guides(colour = guide_legend(ncol = 2)) +
   theme(legend.position = c(.98, .03), legend.justification = c(1, 0), legend.background = element_blank(), legend.key.size = unit(2, "mm"),
         legend.title = element_text(size = 5.4), legend.text = element_text(size = 5.2), legend.key.height = unit(2.1, "mm"))
-# E: HRs for all-cause mortality in cells cross-classified by quartiles of Phenotypic Age acceleration × KSAA (age and sex adjusted; reference Q1×Q1); colors as in Figure 3
+# E: all-cause mortality HRs in cells cross-classified by quartiles of Phenotypic Age acceleration and KSAA
+#   (age and sex adjusted; reference Q1 x Q1); colors as in Figure 3
 c3 <- read.csv("results/analysis/weighted/figure3_cells.csv"); c3 <- c3[c3$outcome == "allcause", ]
 JC1 <- data.frame(panel = "main", y = c3$y, x = c3$x, hr = c3$hr, ref = c3$y == "Q1" & c3$x == "Q1", n = c3$n)
 QL4 <- paste0("Q", 1:4); JC1$x <- factor(JC1$x, QL4); JC1$y <- factor(JC1$y, QL4); JC1$dark <- abs(log(JC1$hr)) > 0.8
@@ -173,7 +179,8 @@ p_joint <- ggplot(JC1, aes(x, y, fill = log(hr))) + geom_tile(colour = "white", 
   labs(x = "Phenotypic Age acceleration quartile", y = "KSAA quartile", subtitle = "All-cause mortality, HR vs Q1 \u00d7 Q1") + th +
   theme(axis.line = element_blank(), axis.ticks = element_blank(), axis.text = element_text(colour = C$ink, size = 5.4),
         plot.subtitle = element_text(size = 5.4, colour = C$muted, hjust = .5, margin = margin(b = 1.5)))
-# F Manhattan plot: the same 482 phenotypes and category colors as Figure 4; categories in alphabetical order on alternating gray/white bands; red dotted line FDR 5%
+# F: Manhattan plot of the 482 phenotypes in Figure 4, same colors; classes in alphabetical order on alternating bands;
+#   red dotted line = FDR 5%
 CORD <- sort(unname(CLS_NAME[unique(PW$health_class)]))
 PW$cat <- factor(CLS_NAME[PW$health_class], CORD); PW <- PW[order(PW$cat, PW$variable), ]; PW$x <- NA_real_; cur <- 0
 for (cc in CORD) { i <- which(PW$cat == cc); PW$x[i] <- cur + seq_along(i); cur <- cur + length(i) + 6 }
@@ -258,7 +265,7 @@ draw <- function() {
   path(c(49.7, 50.5, 50.5, 49.7), c(GY - .3, GY - .3, GE + .3, GE + .3), C$muted, .6); bigarrow(51.4, GM, s = .8)
   tx(PX + PW_ / 2, GY - 3.2, "Pooled OOF\npredictions", 4.8, C$teal, TRUE, just = "centre"); tx(PX + PW_ / 2, GE + 2, sprintf("(n = %s)", cm(nrow(d))), 4.8, just = "centre")
   tx(64, Y1 + 9.4, "Chronological age distribution", 6, bold = TRUE)
-  gA <- ggplotGrob(p_age); pr <- gA$layout[gA$layout$name == "panel", ]  # measure the heights above and below the panel so the panel falls exactly on GY … GE
+  gA <- ggplotGrob(p_age); pr <- gA$layout[gA$layout$name == "panel", ]  # measure the heights above and below the panel so the panel spans GY to GE
   hA <- sum(convertHeight(gA$heights[seq_len(pr$t - 1)], "mm", valueOnly = TRUE)); hB <- sum(convertHeight(gA$heights[(pr$b + 1):length(gA$heights)], "mm", valueOnly = TRUE))
   AGE_H <<- hA + (GE - GY) + hB
   pushViewport(viewport(x = unit(63.5, "mm"), y = unit(H - (GY - hA), "mm"), width = unit(AGE_W, "mm"), height = unit(AGE_H, "mm"), just = c("left", "top"))); grid.draw(gA); popViewport()

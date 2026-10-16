@@ -1,7 +1,8 @@
-# Figure 2 (KSAA quartiles and all-cause / cardiovascular / cancer mortality; one outcome per row: standardized 10-year absolute risk bars on the left, standardized cumulative incidence curves on the right) and Fig. S3 (subgroup forest plot).
-# All results are survey-weighted and precomputed by weighted.R / weighted_boot.R (standardized curves, 10-year absolute risks, P for trend, subgroup HRs); this script only plots.
+# Figure 2 (KSAA quartiles and all-cause, cardiovascular and cancer mortality; one outcome per row: standardized 10-year
+#   absolute risks on the left, standardized cumulative incidence on the right) and Fig. S3 (subgroup forest plot).
+# Plotting only: all estimates are survey-weighted and come from weighted.R and weighted_boot.R.
 # Input: results/analysis/{analysis_data.rds, weighted/{figure2_std_curves, figure2_absrisk, figure2_ptrend, figureS3}.csv}
-# Output: figures/Figure2, FigureS3
+# Output: results/figures/Figure2.{png,pdf}, FigureS3.{png,pdf}
 source(here::here("code", "analysis", "fig_common.R"))
 d <- readRDS(file.path(V3, "analysis_data.rds")); d$ty <- d$t / 12
 QL <- paste0("Q", 1:4); d$q <- factor(d$q, QL)
@@ -13,8 +14,8 @@ FS <- 6                                                  # font size (pt)
 thf <- th + theme(text = element_text(size = FS), axis.text = element_text(size = FS - .5, colour = INK2), axis.title = element_text(size = FS, colour = INK),
                   plot.title = element_text(size = 8, face = "bold"), plot.margin = margin(2, 4, 1, 2))
 
-# ---------------- 1. Standardized curves ----------------
-WD <- file.path(V3, "weighted")  # primary analyses are survey-weighted (weighted.R / weighted_boot.R -> results/analysis/weighted/)
+# ---------------- Standardized curves ----------------
+WD <- file.path(V3, "weighted")
 STD <- read.csv(file.path(WD, "figure2_std_curves.csv")); STD$q <- factor(STD$q, QL); STD$time <- STD$month / 12; s10 <- STD[STD$month == 120, ]
 cat(sprintf("standardized 10-year risk: all-cause %s; cardiovascular %s; cancer %s\n", paste(sprintf("%.1f", 100 * s10$allcause), collapse = "/"),
             paste(sprintf("%.1f", 100 * s10$cvd), collapse = "/"), paste(sprintf("%.1f", 100 * s10$cancer), collapse = "/")))
@@ -25,7 +26,7 @@ YLS <- setNames(paste("Standardized", sub("^C", "c", YL)), names(YL))
 YMAX <- c(allcause = 1, cvd = 0.5, cancer = 0.25); YMAXS <- c(allcause = 1, cvd = 0.5, cancer = 0.25)
 # Layout: no grid, open axes, legend inside the panel
 FS <- 5.2  # font size of the whole figure (except 8-pt bold panel letters)
-FS_SUPP <- 6.5  # font size of the supplementary figure (scaled to about 0.87 in the docx)
+FS_SUPP <- 6.5  # font size of Fig. S3
 mk_thk <- function(FS) theme_classic(base_family = "Arial", base_size = FS) +
   theme(axis.line = element_line(colour = INK, linewidth = .35), axis.ticks = element_line(colour = INK, linewidth = .35), axis.ticks.length = unit(2, "pt"),
         axis.text = element_text(colour = INK, size = FS), axis.title = element_text(colour = INK, size = FS, lineheight = .95),
@@ -83,12 +84,13 @@ PW <- read.csv(file.path(WD, "figure2_ptrend.csv")); PTR <- setNames(PW$p_trend,
 cat(sprintf("P for trend (full cohort, age + sex; cause-specific for cardiovascular / cancer): %s\n", paste(signif(PTR, 3), collapse = " / ")))
 ZM <- plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0)))  # zero outer margins of the combined plot (the default 5.5 pt accumulates)
 
-# ---------------- 3. Subgroups ----------------
-# sex, age, race, BMI, radiographic OA, WHO category of femoral neck BMD; weighted subgroup HRs and Cochran Q heterogeneity P values are written by weighted.R to weighted/figureS3.csv
+# ---------------- Subgroups (Fig. S3) ----------------
+# sex, age, race, BMI, radiographic OA, WHO category of femoral neck BMD; HRs and Cochran Q P values from weighted.R (weighted/figureS3.csv)
 EV <- c(allcause = "e", cvd = "e_cvd", cancer = "e_cancer")
 SW <- read.csv(file.path(WD, "figureS3.csv"), stringsAsFactors = FALSE); SW$dth <- NA
 REFH <- SW[SW$fam == "All participants", c("outcome", "n", "dth", "hr", "lo", "hi")]; SGA <- SW[SW$fam != "All participants", c("outcome", "fam", "lev", "n", "dth", "hr", "lo", "hi", "p_het")]
-# total hip BMD quartiles are not shown (post hoc groups, cut points without clinical meaning, very different sex mix across pooled groups); BMD strata use only the femoral neck WHO categories
+# BMD strata use the femoral neck WHO categories only; total hip BMD quartiles are not shown (cut points without clinical meaning,
+#   very different sex mix across groups)
 FAMD <- c("Sex", "Age", "Race and ethnicity", "BMI", "Radiographic OA (phase 2)", "Femoral neck BMD (WHO)")
 FLAB <- c(BMI = "BMI, kg/m\u00b2")  # display name only
 # first row "All participants": full-cohort HR with the same adjustment set, as the reference for the subgroups
@@ -99,7 +101,7 @@ mk <- function(fams, o) { r <- REFH[REFH$outcome == o, ]
         data.frame(lab = g$lev, hdr = FALSE, n = cm(g$n), dth = cm(g$dth), est = g$hr, lo = g$lo, hi = g$hi, txt = ci(g$hr, g$lo, g$hi), p = "", all = FALSE)) }))) }
 # P is a Cochran Q heterogeneity test across separately fitted strata, not an interaction test
 XL <- c(.9, 1.62); BR <- c(1, 1.2, 1.4, 1.6); SQ <- "#4E7FC4"  # only one reference line at HR = 1
-# the all-cause and cardiovascular blocks share the left subgroup-name and n columns; positions within each block are in mm, and both forest areas are 30 mm wide
+# the all-cause and cardiovascular blocks share the subgroup-name and n columns; positions in mm, both forest areas 30 mm wide
 BW <- c(d = 96, e = 62); GAP <- 6
 ftab <- function(D, span, letter, labels) {   # span: outcome name, used as the spanning header above the block
   FT <- FS
@@ -143,9 +145,8 @@ pdD <- ftab(DD, "All-cause mortality", " ", labels = TRUE)   # letter d sits in 
 pdE <- ftab(DE, "Cardiovascular mortality", " ", labels = FALSE)
 set_fs(5.2)
 
-# ---------------- Assemble the figure (183 mm)----------------
-# ---------------- 2b. Standardized 10-year absolute risk (bar chart) ----------------
-AB <- subset(read.csv(file.path(WD, "figure2_absrisk.csv")), model == "M1 (full cohort)")  # full cohort (same basis as the curves)
+# ---------------- Standardized 10-year absolute risk (bars) and assembly (183 mm) ----------------
+AB <- subset(read.csv(file.path(WD, "figure2_absrisk.csv")), model == "M1 (full cohort)")  # full cohort, as for the curves
 s10b <- STD[STD$month == 120, ]
 for (o in names(OUT)) stopifnot(all.equal(unlist(AB[AB$outcome == o, paste0("Q", 1:4)], use.names = FALSE),
                                           s10b[[o]][match(QL, as.character(s10b$q))], tolerance = 1e-8))   # bars and curves come from the same estimates
@@ -163,7 +164,7 @@ bar_plot <- function(o, lab = NULL, xtitle = TRUE, rdlab = TRUE) {
     coord_cartesian(xlim = c(.4, 4.6), ylim = c(0, ym), expand = FALSE, clip = "off") +  # about half a bar width of space at each end
     labs(title = if (is.null(lab)) OUTB[[o]] else lab, x = if (xtitle) "KSAA quartile" else NULL, y = YTB[[o]]) + thk +
     guides(x = guide_axis(cap = "both"), y = guide_axis(cap = "both")) + theme(plot.margin = margin(6, 6, 2, 2)) +
-    # guide_axis(cap) has no effect on a discrete axis, so the theme x-axis line is turned off and a segment at y = 0 spanning the panel is drawn instead, meeting the y axis at the origin
+    # guide_axis(cap) does not work on a discrete axis: draw the x-axis line as a segment at y = 0 instead
     theme(axis.line.x = element_blank()) + annotate("segment", x = .4, xend = 4.6, y = 0, yend = 0, colour = INK, linewidth = .35, lineend = "square")
   if (rdlab) p0 <- p0 + annotate("text", x = 4.5, y = ym * .99, hjust = 1, vjust = 1, label = rd, size = (FS - .5) / .pt, family = "Arial", colour = INK)
   p0
@@ -183,12 +184,12 @@ fig2_grid <- function() {
 }
 top <- fig2_grid()
 NOM <- theme(plot.margin = margin(0, 0, 0, 0))  # remove the default 5.5-pt margin of the outer wrapper
-warm <- function(x, w, h) ggsave(tempfile(fileext = ".png"), x, width = w, height = h, dpi = 300, bg = "white")  # the first render measures text sizes wrongly, so warm up first
+warm <- function(x, w, h) ggsave(tempfile(fileext = ".png"), x, width = w, height = h, dpi = 300, bg = "white")  # warm-up render: the first render can mis-measure text sizes
 p <- wrap_elements(full = top) + NOM + plot_annotation(theme = theme(plot.margin = margin(4, 4, 4, 4)))
 warm(p, 5.2, 5.2)
 save_fig(p, "Figure2", 5.2, 5.2)
 
-# Supplementary figure: subgroup forest plot (all-cause | cardiovascular blocks share the left subgroup-name and n columns)
+# Fig. S3: subgroup forest plot
 bottom <- pdD + plot_spacer() + pdE + plot_layout(widths = c(BW[["d"]], GAP, BW[["e"]])) + ZM
 psg <- wrap_elements(full = bottom) + NOM + plot_annotation(theme = theme(plot.margin = margin(4, 12, 4, 4)))  # right margin so the header is not clipped
 warm(psg, 7.2, 3.2)

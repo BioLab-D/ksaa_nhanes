@@ -1,5 +1,6 @@
-# PheWAS supplementary tables: tableS8 (Table S8, audit of variables entering the main scan), tableS9 (Table S9, all main-analysis phenotypes)
-# Input results/analysis/phewas/{phewas_results.csv, ewas_audit_table.csv}; output results/analysis/tables/{tableS8,tableS9}.html (styled as in manuscript_tables.R)
+# Tables S8 (audit of the variables in the main scan) and S9 (all main-analysis phenotypes)
+# Input: results/analysis/phewas/{phewas_results.csv, ewas_audit_table.csv}
+# Output: results/analysis/tables/{tableS8,tableS9}.html
 res <- here::here("results"); v3 <- file.path(res, "analysis"); td <- file.path(v3, "tables"); ew <- file.path(v3, "phewas")
 source(here::here("code", "analysis", "phewas_labels.R"))
 mi <- function(x) gsub("-", "−", x, fixed = TRUE)
@@ -56,12 +57,12 @@ writeLines(wrap(HEAD, body, notes_m, 3), file.path(td, "tableS9.html"), useBytes
 stopifnot(all(A$overlap_ksaa[A$in_pool] == "no"))
 P0 <- A[A$in_pool, ]; P <- P0[P0$status == "main", ]
 P <- P[order(factor(P$health_class, CLS_ORDER), P$variable), ]
-# audit table: health-domain display names, weights as variable names (WTPFEX6 / WTPFSD6), handling notes in publication wording
+# audit table: display names of health domains, weight variable names, handling notes
 hand_txt <- function(r) {
   out <- c(); rs <- r$reason; nt <- r$note_cant_do; st <- r$summarise_to; rec <- r$s8_version != ""
   S8T <- c(`binary: any difficulty vs none` = "Analyzed as any difficulty versus none, as in Table S10", `binary: at least one fall` = "Analyzed as at least one fall versus none, as in Table S10",
            `binary: unable to hold 10 s` = "Analyzed as inability to hold the tandem stand for 10 s, as in Table S10")
-  if (rec) out <- c(out, S8T[[r$s8_version]])                       # recoded to binary in place: notes on sparse-level merging and "unable to do" levels no longer apply
+  if (rec) out <- c(out, S8T[[r$s8_version]])                       # recoded to binary: level-merging notes no longer apply
   if (grepl("^sparse category", rs) && !rec) out <- c(out, "Categories with fewer than 30 participants merged with the adjacent category")
   if (grepl("story_recall", st)) out <- c(out, sprintf("Item summed into the %s story-recall total", if (grepl("immediate", st)) "immediate" else "delayed"))
   if (st == "PFP_gait_speed") out <- c(out, "Faster of the two trials converted to gait speed, as in Table S10")
@@ -80,9 +81,9 @@ HA <- c("Variable", "Phenotype", "Health domain", "Type", "Applicable population
 body <- c()
 for (i in seq_len(nrow(P))) { r <- P[i, ]
   typ <- if (r$type == "continuous") "continuous" else sprintf("%d levels", r$n_levels)
-  j <- match(r$variable, R$variable)   # weight actually used (phase-specific items use that phase's weight, fasting measures the morning-subsample weight); items summed into scores follow the audit table
+  j <- match(r$variable, R$variable)   # weight actually used in phewas.R (phase or fasting-subsample weight where applicable)
   wt <- if (!is.na(j)) sub(" .*$", "", R$weight[j]) else if (grepl("WTPFSD6", r$weight_basis)) "WTPFSD6" else if (grepl("^WTPFEX6", r$weight_basis)) "WTPFEX6" else stop("weight: ", r$weight_basis)
-  body <- c(body, row(c(r$variable, tidy(r$label), clsn(r$health_class), typ, "all", r$phase,   # all participants are >= 60 years, so codebook age ranges (e.g. "(2 months and over)") do not apply
+  body <- c(body, row(c(r$variable, tidy(r$label), clsn(r$health_class), typ, "all", r$phase,   # everyone is >= 60, so codebook age ranges do not apply
                        
                         f(100 * r$validity_applicable, 0), cm(r$n_valid), ifelse(is.na(r$min_level_n), "—", cm(r$min_level_n)), wt, hand_txt(r)), nl = 3)) }
 nst <- table(factor(P0$status, c("main", "supplementary", "exposure_module", "covariate", "excluded"))); ex <- P0[P0$status == "excluded", ]

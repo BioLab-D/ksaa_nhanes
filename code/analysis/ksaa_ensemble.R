@@ -1,53 +1,35 @@
-# KSAA: out-of-fold predictions of the five backbones combined with within-fold weights + age-bias correction fitted in the training folds; writes results/ksaa_oof.csv and a performance / downstream Cox log
-# (the "Ensemble (raw)" / "Ensemble (bias-corrected)" lines of the log are parsed by tableS1_performance.R)
-.fresh_rng <- function() { RNGkind("default", "default", "default")   # reset the RNG to the state of a fresh R session at the start of each part
+# KSAA: weighted ensemble of the five backbones' out-of-fold predictions, with age-bias correction fitted in the training folds.
+# Input: results/predictions/m4_<backbone>_{oof,folds}.csv, results/work/{surv_labels,validate_vars}.csv;
+# output: results/ksaa_oof.csv and a log of performance and Cox models (tableS1_performance.R reads its "Ensemble (raw)" / "Ensemble (bias-corrected)" lines)
+.fresh_rng <- function() { RNGkind("default", "default", "default")   # start from a fresh-session RNG state
   if (exists(".Random.seed", envir = globalenv())) rm(".Random.seed", envir = globalenv()) }
 
-# ======== Final knee age model following the Mammo-AGE procedure (Yan et al., Nat Commun 2025): within-fold weighted ensemble of five pre-specified backbones' five-fold OOF predictions + bias correction ========
 .fresh_rng(); local({
-# Final knee age model following the Mammo-AGE procedure (Yan et al., Nat Commun 2025): within-fold weighted ensemble of five pre-specified backbones' five-fold OOF predictions + bias correction
-#  weights ∝ 1/internal-validation MAE in the training folds (normalized within fold), applied only to that fold's held-out participants
-#  bias correction (Smith 2019): Δbias = ŷ − x regressed on x, ŷ_corr = ŷ − (a·x + b), gap = ŷ_corr − x; coefficients from the four folds other than the held-out fold
-#    (no healthy subset in this cohort; a sensitivity analysis uses survivors with >=10 years of follow-up as the reference)
-#  writes the OOF CSV and a log of performance and downstream Cox models (model 3 adds femoral neck BMD, analogous to breast density in Mammo-AGE)
+# Follows Mammo-AGE (Yan et al., Nat Commun 2025). Weights are proportional to 1 / internal-validation MAE in the training folds and are
+# applied only to that fold's held-out participants. Bias correction (Smith 2019): regress (pred - age) on age in the other four folds,
+# pred_corr = pred - (a * age + b). Sensitivity analysis: reference set limited to survivors with >= 10 years of follow-up.
 suppressMessages(library(survival))
-res <- here::here("results"); S <- file.path(res,"server_knee_yolo_20260906")
+res <- here::here("results")
 sp  <- here::here("results", "work")
-V2 <- Sys.getenv("V2","0")=="1"   # V2=1 reads the knee-adapted version in results/predictions/ (4,875 participants)
-d <- if(V2){ o <- read.csv(file.path(res,"predictions/m4_resnet18_oof.csv")); sl0 <- read.csv(file.path(res, "work", "surv_labels.csv")); i <- match(o$SEQN, sl0$SEQN)
-  stopifnot(!anyNA(i), all(o$age==sl0$age[i]))
-  data.frame(SEQN=o$SEQN, age=o$age, t=sl0$PERMTH_EXM[i], e=sl0$MORTSTAT[i], sex=sl0$sex[i], fold=o$fold)
-} else read.csv(file.path(res,"mammo/mammo_ensemble_oof.csv"))[,c("SEQN","age","t","e","sex","fold")]
+o <- read.csv(file.path(res,"predictions/m4_resnet18_oof.csv")); sl0 <- read.csv(file.path(res, "work", "surv_labels.csv")); i <- match(o$SEQN, sl0$SEQN)
+stopifnot(!anyNA(i), all(o$age==sl0$age[i]))
+d <- data.frame(SEQN=o$SEQN, age=o$age, t=sl0$PERMTH_EXM[i], e=sl0$MORTSTAT[i], sex=sl0$sex[i], fold=o$fold)
 sl <- read.csv(file.path(res, "work", "surv_labels.csv")); i <- match(d$SEQN, sl$SEQN); d$race <- sl$race[i]; d$bmi <- sl$bmi[i]; d$fnbmd <- sl$fnbmd[i]
 V <- read.csv(file.path(sp,"validate_vars.csv")); j <- match(d$SEQN, V$SEQN); q8 <- function(x) ifelse(x %in% c(8,9), NA, x)
 d$dm <- as.integer(q8(V$HAD1[j])==1); d$arth <- as.integer(q8(V$HAC1A[j])==1); d$stroke <- as.integer(q8(V$HAC1D[j])==1)
 d$mi <- as.integer(q8(V$HAF10[j])==1); d$smk <- as.integer(q8(V$HAR1[j])==1)
 al <- function(f){ x <- read.csv(f); x$pred_age[match(d$SEQN, x$SEQN)] }
-# each of the five pre-specified backbones trained once (seed 20260831); none selected post hoc on OOF performance
-MV <- Sys.getenv("MV","0")=="1"   # MV=1 reads the official multi-view 448 version
-if(V2){ v2f <- function(a, s="oof") file.path(res, "predictions", sprintf("m4_%s_%s.csv", a, s))
-  A5 <- c("ResNet-18"="resnet18", "ResNet-50"="resnet50", "EfficientNet-B0"="efficientnetb0", "ConvNeXt-Tiny"="convnexttiny", "DenseNet-121"="densenet121")
-  cfg <- lapply(A5, function(a) al(v2f(a)))   # same recipe for all five backbones
-  FM <- sapply(A5, function(a){ f <- read.csv(v2f(a, "folds")); stopifnot(identical(f$fold, 0:4)); f$inner_val_mae })
-  cat("V2=1: knee-adapted v2 (m4 cohort, N = 4); weights from internal-validation MAE in the training folds (v2/m4_*_folds.csv)\n")
-} else if(MV){ MVd <- file.path(res,"mammo_mv"); mvf <- function(a, lr=FALSE) file.path(MVd, sprintf("off_448%s_%s_oof.csv", if(lr) "lr" else "", a))
-  cfg <- list("ResNet-18"=al(mvf("resnet18")), "ResNet-50"=al(mvf("resnet50")), "EfficientNet-B0"=al(mvf("efficientnet_b0")),
-              "ConvNeXt-Tiny"=al(mvf("convnext_tiny", lr=TRUE)), "DenseNet-121"=al(mvf("densenet121")))   # ConvNeXt: rerun with lr lowered on internal validation
-  FM <- sapply(sub("_oof","_foldmae", c(mvf("resnet18"),mvf("resnet50"),mvf("efficientnet_b0"),mvf("convnext_tiny",TRUE),mvf("densenet121"))), function(f) read.csv(f)$mae)
-  cat("MV=1: official multi-view 448 version; weights from the 10% internal-validation MAE within the training folds (as in Mammo-AGE)\n")
-} else cfg <- list(
-  "ResNet-18"       = al(file.path(res,"mammo/mammo_resnet18_oof.csv")),
-  "ResNet-50"       = al(file.path(res,"mammo/mammo_resnet50_oof.csv")),
-  "EfficientNet-B0" = al(file.path(res,"mammo/mammo_efficientnet_b0_oof.csv")),
-  "ConvNeXt-Tiny"   = al(file.path(res,"mammo/mammo_convnext_tiny_oof.csv")),
-  "DenseNet-121"    = al(file.path(res,"mammo/mammo_densenet121_oof.csv")))
+# each pre-specified backbone was trained once (split seed 20260831); none was selected on out-of-fold performance
+v2f <- function(a, s="oof") file.path(res, "predictions", sprintf("m4_%s_%s.csv", a, s))
+A5 <- c("ResNet-18"="resnet18", "ResNet-50"="resnet50", "EfficientNet-B0"="efficientnetb0", "ConvNeXt-Tiny"="convnexttiny", "DenseNet-121"="densenet121")
+cfg <- lapply(A5, function(a) al(v2f(a)))
+FM <- sapply(A5, function(a){ f <- read.csv(v2f(a, "folds")); stopifnot(identical(f$fold, 0:4)); f$inner_val_mae })   # internal-validation MAE by fold
 M <- do.call(cbind, cfg); stopifnot(!anyNA(M)); n <- nrow(d); K <- 0:4; age <- d$age
 
 cat("=========== 1. Within-fold weights (∝ 1/internal-validation MAE, normalized within fold; fold k's held-out participants use only fold k's weights) ===========\n")
-# Leakage guard: fold k uses only W[,k] (not the five-fold mean, whose internal validation sets include the held-out participants); the mean w is reported only; equal weights are a sensitivity analysis.
-# The MV=0 path weights by the OOF MAE in the other four folds.
-W <- if(MV || V2) apply(FM, 1, function(m) (1/m)/sum(1/m)) else sapply(K, function(k){ i <- d$fold!=k; m <- apply(M[i,],2,function(p) mean(abs(p-age[i]))); (1/m)/sum(1/m) })
-if(MV || V2) rownames(W) <- names(cfg)
+# Fold k uses only W[, k]: the five-fold mean weight w would include information from the held-out participants and is only reported.
+# Equal weights are a sensitivity analysis.
+W <- apply(FM, 1, function(m) (1/m)/sum(1/m)); rownames(W) <- names(cfg)
 colnames(W) <- paste0("fold",K); w <- rowMeans(W)
 print(round(cbind(W, mean=w),4))
 d$pred_raw <- NA_real_; for(k in K){ i <- d$fold==k; d$pred_raw[i] <- as.numeric(M[i,,drop=FALSE] %*% W[,k+1]) }
@@ -89,10 +71,6 @@ d$q <- cut(d$gap, quantile(d$gap, 0:4/4), include.lowest=TRUE, labels=paste0("Q"
 mq <- coxph(Surv(t,e)~q+age+factor(sex)+factor(race), d); sq <- summary(mq)$conf.int
 cat("  Quartiles (Q1 reference, model 1):"); for(k in 1:3) cat(sprintf(" Q%d %.3f (%.3f-%.3f)", k+1, sq[k,1],sq[k,3],sq[k,4])); cat(sprintf("   log-rank P = %.1e\n", pchisq(survdiff(Surv(t,e)~q, d)$chisq, 3, lower.tail=FALSE)))
 cat("  Mean corrected gap by age group (independence check, ANCOVA approach):"); for(a in levels(d$ab)) cat(sprintf(" %s %+.2f", a, mean(d$gap[d$ab==a]))); cat("\n")
-if (file.exists(file.path(res, "age_20260831_oof.csv"))) {   # [release] legacy v1-model comparison (diagnostic only; inputs not shipped)
-main <- rowMeans(sapply(c(20260831,11,22), function(s) al(file.path(res,sprintf("age_%d_oof.csv",s))))); acc_main <- resid(lm(main~age, na.action=na.exclude)); cat(sprintf("  Correlation with the residual acceleration of the old primary model (r18, three seeds) %.3f; its HR per SD:", cor(d$gap, acc_main, use="complete.obs")))   # 3 added participants have no old-model prediction
-s <- summary(coxph(Surv(t,e)~z+age+factor(sex)+factor(race), transform(d, z=as.numeric(scale(acc_main)))))$conf.int[1,]; cat(sprintf(" %.3f (%.3f-%.3f)\n", s[1],s[3],s[4]))
-}
 
 out <- d[,c("SEQN","fold","age","pred_raw","pred_corr","gap_raw","gap","q")]; names(out)[7] <- "gap_corr"
 write.csv(out, file.path(res,"ksaa_oof.csv"), row.names=FALSE)

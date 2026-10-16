@@ -1,8 +1,7 @@
-"""Convert all 4,908 knee films to 1024-px 8-bit PNGs as detector input.
+"""Convert the 4,908 knee films to 1024-px 8-bit PNGs for the detector.
 
-The window uses tissue-pixel statistics only: direct-exposure background and lead markers are saturated at 65535,
-and including them in the percentiles would squeeze bone and soft tissue into a narrow grey range.
-Existing files are skipped (the first 800 candidates were already generated).
+The grey-level window uses tissue pixels only: background and lead markers are saturated at 65535 and would
+compress bone and soft tissue into a narrow range. Existing PNGs are skipped.
 """
 import os, glob, sys, numpy as np
 from multiprocessing import Pool

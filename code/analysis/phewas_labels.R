@@ -1,4 +1,4 @@
-# Shared by the PheWAS figures and tables: display names and colours of health classes, and curated variable labels (SAS labels are mostly abbreviated); unlisted variables use the SAS label cleaned by tidy()
+# PheWAS display names and colours of health classes, and variable labels; unlisted variables use the SAS label via tidy()
 CLS_ORDER <- c("objective", "function", "symptom", "disease", "self_rated", "healthcare")
 CLS_NAME <- c(objective = "Objective measures", function_ = "Physical function", symptom = "Symptoms", disease = "Disease history",
               self_rated = "Self-/physician-rated health", healthcare = "Health-care use"); names(CLS_NAME)[2] <- "function"

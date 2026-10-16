@@ -1,9 +1,9 @@
-# Occlusion sensitivity maps: slide a 64 x 64-pixel (@448) patch over one knee, Gaussian-blurring each position (sigma = 16, as in saliency.py --occlude) with the other knee unchanged,
-#   and record the change in the 5 full-data models' ensemble predicted age; each pixel gets the mean |Δ predicted age| over the patches covering it (signed mean also saved).
-#   Measures the regions the model actually relies on, without the upsampling of the coarse Grad-CAM grid (14 x 14). Ensemble weights as in saliency.py (inverse internal-validation MAE).
-# Input: ksaa_for_saliency.csv in results/analysis/saliency/; ROI images (KNEE_ROI) and the full-data models in models/.
-# Output: results/analysis/saliency/occlusion_map<tag>.npz (SEQN, 112 x 112 |Δ| and signed Δ maps per knee, baseline predictions).
-# Run (from the repository root, needs a GPU): python code/interpretability/occlusion_map.py --seqn 1587,41357 --side R [--tag _examples]
+# Occlusion sensitivity maps (Fig. S2): a 64 x 64-pixel patch (at 448) slides over one knee and is Gaussian-blurred (sigma 16,
+#   as in saliency.py --occlude) while the other knee is unchanged. Each pixel gets the mean |change in ensemble predicted age|
+#   over the patches covering it (signed mean also saved). Unlike Grad-CAM, not limited to the coarse 14 x 14 feature grid.
+# Input: results/analysis/saliency/ksaa_for_saliency.csv, ROI images, full-data models in models/
+# Output: results/analysis/saliency/occlusion_map<tag>.npz (per knee: 112 x 112 |change| and signed maps, baseline prediction)
+# Run (GPU): python code/interpretability/occlusion_map.py --seqn 1587,41357 --side R [--tag _examples]
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

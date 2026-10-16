@@ -14,13 +14,13 @@ A5 <- c(resnet18 = "ResNet-18", resnet50 = "ResNet-50", efficientnetb0 = "Effici
 W <- do.call(rbind, lapply(names(A5), function(a) { f <- read.csv(file.path(res, "predictions", sprintf("m4_%s_folds.csv", a))); data.frame(fold = f$fold, backbone = A5[[a]], inner_val_mae = f$inner_val_mae) }))
 W$weight <- ave(1 / W$inner_val_mae, W$fold, FUN = function(x) x / sum(x)); W <- W[order(W$fold, match(W$backbone, A5)), ]; rownames(W) <- NULL
 B <- do.call(rbind, lapply(0:4, function(k) { f <- lm(I(pred_raw - age) ~ age, e[e$fold != k, ]); data.frame(fold = k, intercept = coef(f)[[1]], slope = coef(f)[[2]]) }))
-# the weights and bias-correction coefficients must reproduce the shipped ensemble exactly
+# the fold weights and bias-correction coefficients must reproduce pred_raw and ksaa
 M <- sapply(names(A5), function(a) { x <- read.csv(file.path(res, "predictions", sprintf("m4_%s_oof.csv", a))); x$pred_age[match(e$SEQN, x$SEQN)] })
 raw <- ks <- rep(NA_real_, nrow(e))
 for (k in 0:4) { i <- e$fold == k; raw[i] <- M[i, ] %*% W$weight[W$fold == k]; ks[i] <- raw[i] - e$age[i] - (B$intercept[k + 1] + B$slope[k + 1] * e$age[i]) }
 if (max(abs(raw - e$pred_raw)) > 1e-6 || max(abs(ks - e$ksaa)) > 1e-6) bad <- c(bad, "fold weights / bias correction do not reproduce pred_raw / ksaa")
-# calibration for applying the five full-data checkpoints (models/) to new radiographs: weights averaged over the outer folds and the
-# bias correction fitted on all out-of-fold predictions (never re-fitted on the full-data models' in-sample predictions)
+# calibration for the full-data checkpoints in models/: weights averaged over folds, bias correction fitted on all
+# out-of-fold predictions (not on the full-data models' in-sample predictions)
 fb <- coef(lm(pred_raw ~ age, e))
 CAL <- rbind(data.frame(item = "ensemble_weight", backbone = unname(A5), checkpoint = sprintf("m5_full_%s_full.pt", names(A5)),
                         value = sapply(unname(A5), function(b) mean(W$weight[W$backbone == b]))),
@@ -55,7 +55,7 @@ for (f in names(TAB)) {
   p <- file.path(out, f)
   if (write_mode) { dir.create(dirname(p), showWarnings = FALSE, recursive = TRUE); write.csv(TAB[[f]], p, row.names = FALSE, na = ""); next }
   if (!file.exists(p)) { bad <- c(bad, paste("missing", f)); next }
-  r <- read.csv(p, check.names = FALSE, na.strings = c("", "NA"))   # the PheWAS tables are verbatim copies that write missing values as NA
+  r <- read.csv(p, check.names = FALSE, na.strings = c("", "NA"))   # PheWAS tables are copied as is, with NA for missing
   x <- TAB[[f]]; for (v in names(x)) if (is.character(x[[v]])) x[[v]][!is.na(x[[v]]) & x[[v]] == ""] <- NA   # empty strings are read back as missing
   m <- same(r, x, f); if (!is.null(m)) bad <- c(bad, m)
 }

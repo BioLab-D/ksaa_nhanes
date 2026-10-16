@@ -1,9 +1,9 @@
-# Interpretability step 2: Grad-CAM of predicted age with the 5 final full-data models (visualization only; KSAA remains the cross-fitted OOF value).
-#   Preprocessing as in model/knee_v2.py (pct normalization, left-knee mirroring, bilinear resize to 448, saved mu/sd standardization); readout = mean expected age of the two knees' local heads, deterministic forward pass.
-#   Grad-CAM uses each backbone's last feature map, normalized to sum to 1 per knee, averaged over the 5 backbones weighted by inverse internal-validation MAE, saved at 112 x 112.
-#   --occlude: re-predict after Gaussian blurring each of the 6 anatomical regions in turn (sigma = 16 px @448); blurring introduces fewer artificial edges than constant fill.
-# The full-data models nearly memorize age in their training participants, so reported results use only --heldout (487 participants not used for training).
-# Run (from the repository root): python code/interpretability/saliency.py --heldout --bs 8 [--occlude]; results go to results/analysis/saliency/.
+# Grad-CAM of predicted age from the 5 full-data models (visualization only; KSAA is always the cross-fitted value).
+#   Preprocessing and readout as in code/model/knee_v2.py (mean expected age of the two knees' local heads, no sampling).
+#   Grad-CAM uses each backbone's last feature map, sums to 1 per knee, and is averaged with inverse internal-validation MAE weights.
+#   --occlude: re-predict with each of the 6 anatomical regions Gaussian-blurred (sigma 16 px at 448; fewer edges than a constant fill).
+# The full-data models nearly memorize their training participants, so results use --heldout (487 participants not used for training).
+# Run: python code/interpretability/saliency.py --heldout --bs 8 [--occlude]; output in results/analysis/saliency/
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

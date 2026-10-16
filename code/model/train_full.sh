@@ -1,7 +1,8 @@
 #!/bin/bash
-# Same recipe as the five folds: each of the five backbones is trained once on all 4,875 participants and saved (10% internal validation for early stopping only, no held-out fold), for new radiographs.
-# Manuscript results come from the five-fold OOF predictions, not from these models. Deployment: single-model prediction = mean expected age of the two knees' local heads; ensemble weights and bias correction use the values calibrated on the five-fold OOF predictions,
-#   never re-calibrated on the final models' in-sample predictions (that would underestimate the bias). Each configuration is retried once if no checkpoint is written. Usage: bash train_full.sh
+# Train each of the five backbones once on all 4,875 participants (same recipe as train_5fold.sh; 10% internal validation
+# for early stopping) and save the checkpoints for use on new radiographs. Manuscript results use the out-of-fold predictions,
+# not these models. Ensemble weights and bias correction for these checkpoints come from the out-of-fold predictions
+# (data/derived/new_data_calibration.csv), not from their in-sample predictions. A failed run is retried once. Usage: bash train_full.sh
 export TORCH_HOME=/home/data/torch PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True N_VIEWS=2 DROP=0 NO_ALBUMENTATIONS_UPDATE=1
 PY=${PY:-python}; cd /tmp/mammo_age_official; D=/home/data/knee_yolo/v2; W=$D/weights; mkdir -p $W
 F='grep --line-buffered -vE check_version|fetch_version|validated_self|UserWarning|data.=.fetch'
@@ -19,7 +20,7 @@ run(){ t=$1; shift; L=$D/$t.log
     echo "$(date '+%F %T')  $t attempt $try wrote no checkpoint (see $t.log)" >> $Q; sleep 90
   done
 }
-echo "=== v2 final-model checkpoint queue start $(date '+%F %T') ===" > $Q
+echo "=== full-data checkpoint queue start $(date '+%F %T') ===" > $Q
 run m5_full_resnet18       --arch resnet18
 run m5_full_efficientnetb0 --arch efficientnet_b0
 run m5_full_resnet50       --arch resnet50

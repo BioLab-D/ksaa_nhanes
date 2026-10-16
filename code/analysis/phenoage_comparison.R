@@ -1,14 +1,12 @@
-# KSAA and PhenoAge acceleration: head-to-head comparison (part 1) and combined PhenoAge + KSAA score (part 2).
-.fresh_rng <- function() { RNGkind("default", "default", "default")   # reset the RNG to the state of a fresh R session at the start of each part
+# KSAA vs Phenotypic Age acceleration: head-to-head comparison (part 1) and a combined PhenoAge + KSAA score (part 2); unweighted.
+# Design follows Chen et al., Cell Rep Methods 2025;5:101115, Fig. 5. Sample: participants with PhenoAge (n = 4,522).
+# Input: results/analysis/analysis_data.rds; output: results/analysis/phenoage_wald.csv, phenoage_combined_{scores,cindex,improvement}.csv
+.fresh_rng <- function() { RNGkind("default", "default", "default")   # each part starts from a fresh-session RNG state
   if (exists(".Random.seed", envir = globalenv())) rm(".Random.seed", envir = globalenv()) }
 
-# ======== R6: head-to-head comparison of KSAA and PhenoAge acceleration (joint model + Wald test of the coefficient difference) ========
+# ======== Part 1: both markers in one model, Wald test of the difference between the coefficients ========
 .fresh_rng(); local({
-# R6: head-to-head comparison of KSAA and PhenoAge acceleration (joint model + Wald test of the coefficient difference)
-# Design follows Chen et al. Cell Rep Methods 2025;5:101115, Fig. 5D.
-# Sample = participants with pa_accel (n = 4,522); each measure standardized within this sample; adjusted for age + sex.
-#   Panel D: both in one model, Wald test of the difference between the two coefficients (joint covariance, accounts for their correlation)
-# Input results/analysis/analysis_data.rds; output results/analysis/phenoage_wald.csv
+# Each marker is standardized within the sample; adjusted for age and sex. The Wald test uses the joint covariance of the two coefficients.
 suppressMessages(library(survival))
 res <- here::here("results"); out <- file.path(res, "analysis")
 d <- readRDS(file.path(out, "analysis_data.rds"))
@@ -41,13 +39,10 @@ cat(sprintf("\n  Note: ratio = KSAA HR / PhenoAge HR (same model); the Wald test
 cat("\n-> phenoage_wald.csv\n")
 })
 
-# ======== R7: PhenoAge alone vs combined PhenoAge + KSAA score (HR per SD / by category, C and R²_D, bootstrap CI of the improvement) ========
+# ======== Part 2: PhenoAge alone vs combined PhenoAge + KSAA score (HRs, C and R²_D, bootstrap CI of the improvement) ========
 .fresh_rng(); local({
-# R7: PhenoAge alone vs combined PhenoAge + KSAA score (HR per SD / by category, C and R²_D, bootstrap CI of the improvement)
-# Structure follows Chen et al. Cell Rep Methods 2025;5:101115, Fig. 5A–C. A KSAA-only score is also computed, for reference only.
-# Score = linear combination of the marker terms in a Surv ~ markers + age + sex model, standardized to SD = 1 and entered as a single variable.
-# Combination weights are estimated in the same participants (apparent values, no optimism correction), so improvements need CIs: each bootstrap resample re-estimates the weights and the quantile cut points.
-# Sample = participants with pa_accel, n = 4,522. Input results/analysis/analysis_data.rds; outputs phenoage_combined_scores.csv, phenoage_combined_cindex.csv, phenoage_combined_improvement.csv
+# Score = marker part of the linear predictor of Surv ~ markers + age + sex, scaled to SD 1. A KSAA-only score is computed for reference.
+# Weights are estimated in the same participants (apparent values), so each bootstrap resample re-estimates the weights and cut points.
 suppressMessages({library(survival); library(parallel)})
 RNGkind("L'Ecuyer-CMRG"); set.seed(20260915); NC <- max(1, detectCores() - 1); B <- 200
 res <- here::here("results"); out <- file.path(res, "analysis")
@@ -96,8 +91,8 @@ for (o in names(EV)) { ev <- EV[[o]]
 }
 write.csv(S, file.path(out, "phenoage_combined_scores.csv"), row.names = FALSE)
 
-# ---------- Discrimination + explained variation ----------
-# Royston–Sauerbrei R²_D (R.D of survival::royston), like C a whole-model quantity, computed in the same resample; relative gain = combined / PhenoAge − 1 (%)
+# ---------- Discrimination and explained variation ----------
+# Royston-Sauerbrei R²_D (R.D from survival::royston); relative gain = combined / PhenoAge - 1 (%)
 cfit <- function(dat, ev) {
   f <- lapply(SCORE, function(v) coxph(as.formula(sprintf("Surv(t, %s) ~ %s + %s", ev, paste(v, collapse = " + "), ADJ)), dat))
   c(setNames(sapply(f, function(m) concordance(m)$concordance), c("C_pa", "C_ks", "C_cb")),
@@ -124,7 +119,7 @@ for (o in names(EV)) { ev <- EV[[o]]
 rownames(C) <- NULL
 write.csv(C, file.path(out, "phenoage_combined_cindex.csv"), row.names = FALSE)
 
-# ---------- Bootstrap CI of the improvement (combined / PhenoAge): each resample re-estimates the weights and cut points ----------
+# ---------- Bootstrap CI of the improvement (combined vs PhenoAge) ----------
 one_boot <- function(x, ev) {
   x$sc <- mkscore(x, ev, SCORE[[1]])
   a_sd <- hr_sd_of(x, ev)[["hr"]]; a_95 <- hr_cat_of(x, ev, "p95")[["hr"]]; a_q5 <- hr_cat_of(x, ev, "q5")[["hr"]]

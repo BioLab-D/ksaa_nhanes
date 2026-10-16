@@ -1,8 +1,9 @@
-# Interpretability figures and quantification (Fig. S2); inputs come from saliency_images.py and saliency.py --heldout [--occlude].
-#   Default layout: 3 same-sex example pairs from the internal validation set, age difference <= 1 year (KSAA near the cohort's 90th / 10th percentile), right-knee image + Grad-CAM.
-#   Quantitative output (saliency_summary.txt / saliency_regions.csv): correlation of the age and KSAA difference maps (null = KSAA permuted within age strata),
-#   enrichment ratios of the 6 anatomical regions and MAE increase after occlusion (bootstrap CI).
-# Run (from the repository root): python code/interpretability/saliency_figure.py
+# Grad-CAM summaries and example figure (supporting analyses; Fig. S2 itself is drawn by occlusion_figure.py).
+#   Reports the correlation of the age and KSAA difference maps (null: KSAA permuted within age strata), enrichment of the
+#   6 anatomical regions, and the MAE increase after region occlusion (bootstrap CI). Examples: 3 same-sex pairs, ages within 1 year.
+# Input: outputs of saliency_images.py and saliency.py --heldout [--occlude] in results/analysis/saliency/
+# Output: saliency_summary.txt, saliency_regions.csv, results/figures/gradcam_examples.{png,pdf}
+# Run: python code/interpretability/saliency_figure.py
 import os, sys, csv, numpy as np, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt, matplotlib.gridspec as gridspec, torch, torch.nn.functional as F
@@ -13,7 +14,7 @@ plt.rcParams.update({"font.family": "Arial", "font.size": 7, "axes.linewidth": 0
 INK, INK2, MUTED = "#0b0b0b", "#52514e", "#898781"; Q1C, Q4C = "#9DB4C8", "#C8372D"      # quartile colors as in the main figures
 import argparse; ap = argparse.ArgumentParser(); ap.add_argument("--tag", default="_heldout"); ap.add_argument("--out", default="")
 ap.add_argument("--layout", default="examples", choices=["examples", "full"]); A = ap.parse_args()
-# --layout full: six-panel version (not in the manuscript); --tag _n40 --out <dir>: layout debugging only
+# --layout full: six-panel version (saliency_full.{png,pdf}); --tag _n40 --out <dir>: quick test on a subset
 TEST = A.tag != "_heldout"; FIGD = A.out or os.path.join(KB, "results", "figures"); SUM = A.out or OUT
 rng = np.random.default_rng(20260922); NB = 100 if TEST else 500
 mi = lambda s: s.replace("-", "−")
@@ -73,7 +74,7 @@ MCAM = CAM.mean((0, 1))
 
 # ---------- occlusion test ----------
 labs = ["None"] + REG
-if TEST:                                                                                 # debugging: unoccluded prediction + noise instead
+if TEST:                                                                                 # test mode: unoccluded prediction plus noise
     E = np.repeat(pH[:, None], 7, 1) + rng.normal(0, 1, (n_ho, 7)) * (np.arange(7) > 0); occ = [{"region": labs[g], "SEQN": ho[i]["SEQN"]} for i in range(n_ho) for g in range(7)]
 else:
     occ = list(csv.DictReader(open(os.path.join(OUT, f"occlusion{A.tag}.csv")))); E = np.array([float(r["pred_full_ens"]) for r in occ]).reshape(n_ho, 7)

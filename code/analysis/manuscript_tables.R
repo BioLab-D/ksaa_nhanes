@@ -1,5 +1,5 @@
-# Manuscript tables (HTML fragments): table1 (Table 1), tableS1 (Table S1, backbone performance), tableS3 (Table S3, characteristics by KSAA quartile); all computed from results/analysis/*.csv and the OOF predictions, nothing copied by hand; written to results/analysis/tables/<name>.html.
-# Embedded by build_manuscript_imrad.py via <!--HTML:<name>-->. The Office files are the manuscript of record; table numbers in the notes only affect the regenerated HTML.
+# Manuscript tables as HTML fragments: Table 1, Table S1 (backbone performance) and Table S3 (characteristics by KSAA quartile).
+# Input: results/analysis/*.csv and the out-of-fold predictions. Output: results/analysis/tables/{table1,tableS1,tableS3}.html
 res <- here::here("results"); v3 <- file.path(res, "analysis"); td <- file.path(v3, "tables")
 dir.create(td, showWarnings = FALSE)
 mi <- function(x) gsub("-", "−", x, fixed = TRUE)
@@ -12,7 +12,7 @@ hdr <- function(txt, k) sprintf('<tr class="hdr"><td colspan="%d">%s</td></tr>',
 put <- function(name, head, body, notes, thead = NULL) {   # thead: optional custom (two-level) header, default th(head)
   html <- paste0('<div class="twrap"><table>', if (is.null(thead)) th(head) else thead, "<tbody>", paste0(body, collapse = ""), "</tbody></table></div>", '<div class="tnote">', paste0("<p>", notes, "</p>", collapse = ""), "</div>")
   html <- gsub("<(?=[0-9=\\s])", "&lt;", html, perl = TRUE)
-  html <- gsub("[Kk]nee age gap", "KSAA", html)   # show the main exposure as KSAA (CSV and match keys unchanged); the line above escapes < outside tags (BMI <25, HDL <40, etc.)
+  html <- gsub("[Kk]nee age gap", "KSAA", html)   # label the exposure KSAA in the HTML only; the line above escapes "<" outside tags (BMI <25, etc.)
   writeLines(html, file.path(td, paste0(name, ".html")), useBytes = TRUE); cat("->", name, "\n")
 }
 d <- readRDS(file.path(v3, "analysis_data.rds")); qc <- quantile(d$gap, 1:3 / 4)
@@ -26,7 +26,7 @@ fm <- function(p) { m <- sapply(0:4, function(k) met(p[d$fold == k], d$age[d$fol
 body <- c()
 for (nm in names(A5)) { x <- read.csv(file.path(res, "predictions", sprintf("m4_%s_oof.csv", A5[[nm]]))); p <- x$pred_age[match(d$SEQN, x$SEQN)]; stopifnot(!anyNA(p)); body <- c(body, row(c(nm, fm(p)))) }
 body <- c(body, row(c("Weighted ensemble<sup>a</sup>", fm(d$pred_raw)), cls = "bold"))
-# All metrics use the uncorrected prediction (the bias correction uses chronological age); the note reports the per-fold MAE range and the training-fold median baseline.
+# Metrics use the uncorrected prediction, because the bias correction itself uses chronological age
 me <- sapply(0:4, function(k) met(d$pred_raw[d$fold == k], d$age[d$fold == k])["MAE"])
 base <- rep(NA_real_, nrow(d)); for (k in 0:4) base[d$fold == k] <- median(d$age[d$fold != k])
 bm <- sapply(0:4, function(k) { i <- d$fold == k; mean(abs(base[i] - d$age[i])) })
@@ -37,7 +37,7 @@ put("tableS1", c("Model", "MAE, years", "RMSE, years", "CS (α = 5 years), %", "
 # ---------- baseline characteristics by KSAA quartile ----------
 T1 <- read.csv(file.path(v3, "quartile_characteristics.csv"), stringsAsFactors = FALSE); T1[is.na(T1)] <- ""
 nq <- T1[T1$lab == "Participants, n", ]
-# Drop section headers and the deaths block; quartile_characteristics.csv itself is unchanged (the Table 1 self-check gq() uses its death rows).
+# drop section headers and the deaths block here; gq() below still reads the death rows from the CSV
 S2DROP <- c("All-cause deaths", "Cardiovascular deaths", "Cancer deaths")
 T1 <- T1[T1$type != "hdr" & !(T1$lab %in% S2DROP), ]
 lab3 <- function(x) { x <- sub(", y$", ", years", x); x <- sub("Poverty-income", "Poverty–income", x, fixed = TRUE); sub("hip, wrist, or spine fracture", "hip, wrist or vertebral fracture", x, fixed = TRUE) }
@@ -46,7 +46,7 @@ for (i in seq_len(nrow(T1))) { r <- T1[i, ]
   body <- c(body, if (r$type == "hdr") hdr(r$lab, 6) else row(c(lab3(gsub("<sup>[^<]*</sup>", "", r$lab)), r$Q1, r$Q2, r$Q3, r$Q4, r$p), r$ind == 1)) }   # lab3() harmonizes units and row labels (quartile_characteristics.csv uses different wording)
 body <- body[!grepl("Participants, n", body, fixed = TRUE)]
 put("tableS3", c("Characteristic", sprintf("Q1 (n = %s)", nq$Q1), sprintf("Q2 (n = %s)", nq$Q2), sprintf("Q3 (n = %s)", nq$Q3), sprintf("Q4 (n = %s)", nq$Q4), "P"), body, c(
-  # column named P: multi-category rows use a χ² test, not a trend test; age is U-shaped, explained in the note
+  # P: Rao-Scott test for categorical rows (not a trend test); age is U-shaped across quartiles, see the note
   sprintf("Data are mean (SD) or n (%%), unweighted; definitions as in Table 1 and the Supplementary Methods, and whole-cohort values in Table 1. Percentages were calculated among participants with available data. Current alcohol use is ≥12 alcoholic drinks in the past 12 months and inactive is no leisure-time physical activity, as in Table 1. Quartile cut points %s, %s and %s years (Q4, knee older than expected for age). P values are from linear regression (continuous characteristics) or logistic regression (binary characteristics) on the quartile number, and from a χ² test for characteristics with more than two categories (race and ethnicity, education, smoking, alcohol use and leisure-time physical activity), for which no trend is implied. Mean age is highest in the lowest and in the highest quartile, so for age the regression on quartile number does not describe the U-shaped pattern.", f(qc[1]), f(qc[2]), f(qc[3]))))
 
 # ---------- Table 1 (fxf_vars.csv is written by fracture_function_vars.R) ----------
@@ -61,9 +61,9 @@ chk <- list(c("Age, years", msd(d1$age, 1)), c("Sex, female", pb(as.integer(d1$s
   c("Total cholesterol, mmol/L", msd(d1$tc / 38.67, 2)), c("HDL cholesterol, mmol/L", msd(d1$hdl / 38.67, 2)), c("eGFR, mL/min/1.73 m²<sup>b</sup>", msd(d1$egfr, 1)), c("Phenotypic Age acceleration, years<sup>c</sup>", msd(d1$pa_accel, 1)),
   c("Total hip BMD, g/cm²<sup>d</sup>", msd(d1$tot_bmd, 3)), c("Radiographic knee OA<sup>e</sup>", pb(as.integer(d1$klmax >= 2))), c("Knee pain", pb(d1$pain)),
   c("Gait speed, m/s", msd(d1$gait, 2)), c("≥1 fall in the past 12 months", pb(d1$fall)), c("Knee age gap, mean (SD), y", msd(d1$gap, 2)), c("Cardiovascular deaths", pb(d1$e_cvd)))
-for (z in chk) if (gq(z[1]) != z[2]) stop("Table 1 and the Table S2 overall column disagree: ", z[1], " ", gq(z[1]), " vs ", z[2])
+for (z in chk) if (gq(z[1]) != z[2]) stop("Table 1 and the Table S3 overall column disagree: ", z[1], " ", gq(z[1]), " vs ", z[2])
 rk <- summary(survival::survfit(survival::Surv(t / 12, 1 - e) ~ 1, data = d1))$table; qq <- quantile(survival::survfit(survival::Surv(t / 12, 1 - e) ~ 1, data = d1), c(.25, .5, .75))$quantile
-# Table 1: items with missing data are listed in a footnote; education as years of schooling (HFA8R, cleaned value from ewas_clean.rds); race shows non-Hispanic White only
+# Table 1: missing data in a footnote; education in years (cleaned HFA8R from ewas_clean.rds); race as non-Hispanic White
 CLN <- readRDS(file.path(v3, "phewas", "ewas_clean.rds")); stopifnot(identical(CLN$SEQN, d1$SEQN)); d1$edu_y <- CLN$x[["HFA8R"]]
 NMISS <- list(); mrow <- function(lab, x, dig, ind = FALSE) { if (sum(!is.na(x)) < nrow(d1)) NMISS[[lab]] <<- sum(!is.na(x)); row(c(lab, msd(x, dig)), ind) }
 brow <- function(lab, x, ind = FALSE) { if (sum(!is.na(x)) < nrow(d1)) NMISS[[lab]] <<- sum(!is.na(x)); row(c(lab, pb(x)), ind) }

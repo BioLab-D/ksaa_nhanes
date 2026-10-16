@@ -1,6 +1,5 @@
 #!/bin/bash
-# Knee film preprocessing pipeline: conversion -> detection -> ROI cropping.
-# Each step is re-entrant (existing outputs are skipped).
+# Preprocessing: PNG conversion -> knee detection -> ROI cropping. Existing outputs are skipped, so the script can be rerun.
 PY=${PY:-python}
 cd /home/data/knee_yolo/work || exit 1
 
