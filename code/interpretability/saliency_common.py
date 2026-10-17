@@ -1,4 +1,3 @@
-# Shared code for the interpretability scripts: paths, preprocessing as in training, anatomical regions.
 import os, numpy as np, torch, torch.nn.functional as F
 from PIL import Image
 KB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -8,7 +7,7 @@ MODELS = os.environ.get("KSAA_MODELS", os.path.join(KB, "models"))    # final fu
 SNAP = os.path.join(KB, "code", "model")        # Mammo-AGE model code
 S, R = 448, 112                                                     # model input size; grid size for saved maps and figures
 REG = ["Femur, lateral", "Femur, medial", "Joint band, lateral", "Joint band, medial", "Tibia, lateral", "Tibia, medial"]
-HALF = 8                                                             # joint band = joint line ± 8 rows (112 grid; about 15% of ROI height)
+HALF = 8                                                             # joint band = joint line +/- 8 rows (112 grid; about 15% of ROI height)
 
 def roi_file(seqn, side):                                           # 3 participants have only a second knee film (K2)
     f = os.path.join(ROI, f"{seqn}K1_{side}.png")

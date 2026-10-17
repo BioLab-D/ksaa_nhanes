@@ -1,9 +1,3 @@
-# Occlusion sensitivity maps (Fig. S2): a 64 x 64-pixel patch (at 448) slides over one knee and is Gaussian-blurred (sigma 16,
-#   as in saliency.py --occlude) while the other knee is unchanged. Each pixel gets the mean |change in ensemble predicted age|
-#   over the patches covering it (signed mean also saved). Unlike Grad-CAM, not limited to the coarse 14 x 14 feature grid.
-# Input: results/analysis/saliency/ksaa_for_saliency.csv, ROI images, full-data models in models/
-# Output: results/analysis/saliency/occlusion_map<tag>.npz (per knee: 112 x 112 |change| and signed maps, baseline prediction)
-# Run (GPU): python code/interpretability/occlusion_map.py --seqn 1587,41357 --side R [--tag _examples]
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -78,7 +72,7 @@ for n, s in enumerate(SEQ):
             cnt[r0:r0 + A.patch, c0:c0 + A.patch] += 1
     pool = lambda t: F.adaptive_avg_pool2d((t / cnt)[None, None], R)[0, 0].cpu().numpy()
     ABS[n], SGN[n] = pool(acc_a), pool(acc_s)
-    print(f"{n + 1}/{len(SEQ)} SEQN {s}: baseline {base:.2f}, max |Δ| {ABS[n].max():.3f} years, {time.time() - t0:.0f}s", flush=True)
+    print(f"{n + 1}/{len(SEQ)} SEQN {s}: baseline {base:.2f}, max |change| {ABS[n].max():.3f} years, {time.time() - t0:.0f}s", flush=True)
 np.savez(os.path.join(OUT, f"occlusion_map{A.tag}.npz"), seqn=np.array(SEQ), side=A.side, patch=A.patch,
          stride=A.stride, abs=ABS, signed=SGN, base=BASE)
 print(f"-> occlusion_map{A.tag}.npz  done {time.time() - t0:.0f}s", flush=True)

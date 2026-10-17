@@ -1,8 +1,3 @@
-# Weighted analyses that need replicate weights: Figure 2 standardized risks and curves; Figure 3B and Table S6 discrimination
-# (Harrell C, R²_D). Rao–Wu rescaling bootstrap (as.svrepdesign, type = "subbootstrap") on the design of all examinees, then
-# restricted to the cohort; each model is refitted with every replicate's weights and 95% CIs are percentiles. Phase 2 (K–L)
-# analyses use replicates of the phase 2 design.
-# Output: results/analysis/weighted/{figure2_*,figure3b_cindex,tableS6}.csv
 source(here::here("code", "analysis", "weighted_common.R"))
 suppressMessages(library(parallel)); NC <- max(1, detectCores() - 1)
 set.seed(20260929); R_RISK <- 500; R_C <- 200
@@ -10,7 +5,7 @@ RW6 <- weights(as.svrepdesign(D6, type = "subbootstrap", replicates = R_RISK), t
 RW2 <- weights(as.svrepdesign(D2, type = "subbootstrap", replicates = R_C), type = "analysis")
 
 # ---------------- Figure 2: standardized cumulative incidence (g-formula; weights enter the Cox fit and the population average) ----------------
-co <- F[F$inc, ]; wco <- co$W6; rco <- RW6[F$inc, ]
+co <- adult[adult$inc, ]; wco <- co$W6; rco <- RW6[adult$inc, ]
 stdrisk <- function(dat, w, grid) {
   k <- w > 0; dat <- dat[k, ]; w <- w[k]; dat$w <- w   # drop rows with replicate weight 0 (PSU not drawn)
   step_at <- function(bh, g) { i <- findInterval(g, bh$time); c(0, bh$hazard)[i + 1] }
@@ -29,14 +24,14 @@ stdrisk <- function(dat, w, grid) {
   })
   do.call(rbind, out)
 }
-CUR <- stdrisk(co, wco, 0:360); write.csv(CUR, file.path(W, "figure2_std_curves.csv"), row.names = FALSE)
+CUR <- stdrisk(co, wco, 0:360); write.csv(CUR, file.path(wdir, "figure2_std_curves.csv"), row.names = FALSE)
 est10 <- CUR[CUR$month == 120, ]
 bt <- simplify2array(mclapply(seq_len(R_RISK), function(b) {
   x <- stdrisk(co, rco[, b], 0:120); x <- x[x$month == 120, ]
   unlist(x[x$q == "Q4", c("allcause", "cvd", "cancer")] - x[x$q == "Q1", c("allcause", "cvd", "cancer")])
 }, mc.cores = NC))
 # Model 3, all-cause (complete cases)
-c3 <- F[F$cc, ]; w3 <- c3$W6; r3 <- RW6[F$cc, ]
+c3 <- adult[adult$cc, ]; w3 <- c3$W6; r3 <- RW6[adult$cc, ]
 std3 <- function(w) {
   k <- w > 0; dat <- c3[k, ]; w <- w[k]; dat$w <- w
   fit <- coxph(as.formula(paste("Surv(t, e) ~ q +", MODS[["m3"]])), dat, weights = w)
@@ -54,28 +49,28 @@ AR <- rbind(
     rd_lo = quantile(bt[o, ], .025), rd_hi = quantile(bt[o, ], .975)))),
   data.frame(model = "M3 (complete cases)", outcome = "allcause", Q1 = e3[[1]], Q2 = e3[[2]], Q3 = e3[[3]], Q4 = e3[[4]],
              rd = e3[[4]] - e3[[1]], rd_lo = quantile(bt3, .025), rd_hi = quantile(bt3, .975)))
-write.csv(AR, file.path(W, "figure2_absrisk.csv"), row.names = FALSE)
+write.csv(AR, file.path(wdir, "figure2_absrisk.csv"), row.names = FALSE)
 cat("=========== Figure 2 standardized 10-year risk (weighted) ===========\n")
-for (i in seq_len(nrow(AR))) with(AR[i, ], cat(sprintf("  %-20s %-8s Q1 %.1f Q2 %.1f Q3 %.1f Q4 %.1f | Q4−Q1 %.1f (%.1f to %.1f)\n",
+for (i in seq_len(nrow(AR))) with(AR[i, ], cat(sprintf("  %-20s %-8s Q1 %.1f Q2 %.1f Q3 %.1f Q4 %.1f | Q4-Q1 %.1f (%.1f to %.1f)\n",
   model, outcome, 100 * Q1, 100 * Q2, 100 * Q3, 100 * Q4, 100 * rd, 100 * rd_lo, 100 * rd_hi)))
 c30 <- CUR[CUR$month == 360, ]
 cat(sprintf("  30 years: cancer %s; cardiovascular %s; all-cause %s\n", paste(sprintf("%.1f", 100 * c30$cancer), collapse = "/"),
             paste(sprintf("%.1f", 100 * c30$cvd), collapse = "/"), paste(sprintf("%.1f", 100 * c30$allcause), collapse = "/")))
-PT <- sapply(EV, function(ev) wcox(dom6(F$inc), "qmed + age + factor(sex)", term = "qmed", ev = ev)[["p"]])
-write.csv(data.frame(outcome = names(EV), p_trend = PT), file.path(W, "figure2_ptrend.csv"), row.names = FALSE)
+PT <- sapply(EV, function(ev) wcox(dom6(adult$inc), "qmed + age + factor(sex)", term = "qmed", ev = ev)[["p"]])
+write.csv(data.frame(outcome = names(EV), p_trend = PT), file.path(wdir, "figure2_ptrend.csv"), row.names = FALSE)
 cat(sprintf("  P for trend (full cohort, age + sex, weighted): %s\n", paste(sprintf("%s %.2g", names(EV), PT), collapse = "; ")))
 
-# ---------------- Discrimination: weighted Harrell C and weighted R²_D ----------------
+# ---------------- Discrimination: weighted Harrell C and weighted R2_D ----------------
 KAP <- sqrt(8 / pi)
 wC <- function(tt, ee, lp, w) concordance(Surv(tt, ee) ~ lp, weights = w, reverse = TRUE)$concordance
-wR2 <- function(tt, ee, lp, w) {   # Royston-Sauerbrei R²_D with weighted normal scores
+wR2 <- function(tt, ee, lp, w) {   # Royston-Sauerbrei R2_D with weighted normal scores
   o <- order(lp); cw <- cumsum(w[o]); p <- numeric(length(lp)); p[o] <- (cw - w[o] / 2) / sum(w)
   s <- qnorm(p) / KAP; D <- coef(coxph(Surv(tt, ee) ~ s, weights = w)); r <- unname(D / KAP)^2
   r / (pi^2 / 6 + r)
 }
 # without weights this matches R.D from survival::royston
-sp <- F$inc & !is.na(F$pa_accel); s0 <- F[sp, ]; m0 <- coxph(Surv(t, e) ~ age + factor(sex) + pa_accel, s0)
-cat(sprintf("\nSelf-check: unweighted R²_D this implementation %.4f, royston %.4f; C this implementation %.4f, concordance %.4f\n",
+sp <- adult$inc & !is.na(adult$pa_accel); s0 <- adult[sp, ]; m0 <- coxph(Surv(t, e) ~ age + factor(sex) + pa_accel, s0)
+cat(sprintf("\nSelf-check: unweighted R2_D this implementation %.4f, royston %.4f; C this implementation %.4f, concordance %.4f\n",
             wR2(s0$t, s0$e, predict(m0), rep(1, nrow(s0))), royston(m0)[["R.D"]],
             wC(s0$t, s0$e, predict(m0), rep(1, nrow(s0))), concordance(m0)$concordance))
 disc <- function(dat, w, ev, base, add) {
@@ -103,14 +98,14 @@ for (o in names(EV)) {
   bs <- simplify2array(mclapply(seq_len(R_C), function(b) disc(s0, rs[, b], ev, "age + factor(sex) + pa_accel", "gap"), mc.cores = NC))
   CB <- rbind(CB, cbind(outcome = o, summ(pt, bs, "fig3b")))
 }
-write.csv(CB, file.path(W, "figure3b_cindex.csv"), row.names = FALSE)
+write.csv(CB, file.path(wdir, "figure3b_cindex.csv"), row.names = FALSE)
 for (i in seq_len(nrow(CB))) with(CB[i, ], cat(sprintf(
-  "  %-8s C %.3f -> %.3f  ΔC %.4f (%.4f, %.4f)  relative %.2f%% (%.2f, %.2f) | R²_D %.3f -> %.3f relative %.1f%% (%.1f, %.1f)\n",
+  "  %-8s C %.3f -> %.3f  dC %.4f (%.4f, %.4f)  relative %.2f%% (%.2f, %.2f) | R2_D %.3f -> %.3f relative %.1f%% (%.1f, %.1f)\n",
   outcome, C0, C1, dC, dC_lo, dC_hi, relC, relC_lo, relC_hi, R0, R1, relR2, relR2_lo, relR2_hi)))
 
 cat("\n=========== Table S6 (weighted; all-cause mortality, nested models) ===========\n")
 M3 <- MODS[["m3"]]; S6 <- NULL
-sb <- F$cc & !is.na(F$pa_accel); x <- F[sb, ]; rb <- RW6[sb, 1:R_C]
+sb <- adult$cc & !is.na(adult$pa_accel); x <- adult[sb, ]; rb <- RW6[sb, 1:R_C]
 pt1 <- disc(x, x$W6, "e", M3, "pa_accel")
 bs1 <- simplify2array(mclapply(seq_len(R_C), function(b) disc(x, rb[, b], "e", M3, "pa_accel"), mc.cores = NC))
 pt2 <- disc(x, x$W6, "e", paste(M3, "+ pa_accel"), "gap")
@@ -125,7 +120,7 @@ S6 <- rbind(S6,
         p_wald = pw(dom6(sb), paste(M3, "+ pa_accel"), "pa_accel")),
   cbind(summ(pt2, bs2, "Beyond PhenoAge: + KSAA"), n = nrow(x), events = sum(x$e),
         p_wald = pw(dom6(sb), paste(M3, "+ pa_accel + gap"), "gap")))
-s2 <- F2$cc & F2$phase_all == 2 & !is.na(F2$klmax); y <- F2[s2, ]; r2 <- RW2[s2, 1:R_C]
+s2 <- adult2$cc & adult2$phase_all == 2 & !is.na(adult2$klmax); y <- adult2[s2, ]; r2 <- RW2[s2, 1:R_C]
 pt3 <- disc(y, y$W2, "e", M3, "klmax")
 bs3 <- simplify2array(mclapply(seq_len(R_C), function(b) disc(y, r2[, b], "e", M3, "klmax"), mc.cores = NC))
 pt4 <- disc(y, y$W2, "e", paste(M3, "+ klmax"), "gap")
@@ -136,7 +131,7 @@ S6 <- rbind(S6,
         p_wald = pw(D2s, paste(M3, "+ klmax"), "klmax")),
   cbind(summ(pt4, bs4, "Beyond K–L (phase 2): + KSAA"), n = nrow(y), events = sum(y$e),
         p_wald = pw(D2s, paste(M3, "+ klmax + gap"), "gap")))
-write.csv(S6, file.path(W, "tableS6.csv"), row.names = FALSE)
-for (i in seq_len(nrow(S6))) with(S6[i, ], cat(sprintf("  %-48s %d/%d  C %.3f -> %.3f  ΔC %.3f (%.3f, %.3f)  Wald P %.2g\n",
+write.csv(S6, file.path(wdir, "tableS6.csv"), row.names = FALSE)
+for (i in seq_len(nrow(S6))) with(S6[i, ], cat(sprintf("  %-48s %d/%d  C %.3f -> %.3f  dC %.3f (%.3f, %.3f)  Wald P %.2g\n",
   block, events, n, C0, C1, dC, dC_lo, dC_hi, p_wald)))
 cat("\n-> results/analysis/weighted/\n")

@@ -1,8 +1,3 @@
-# Figure 2 (KSAA quartiles and all-cause, cardiovascular and cancer mortality; one outcome per row: standardized 10-year
-#   absolute risks on the left, standardized cumulative incidence on the right) and Fig. S3 (subgroup forest plot).
-# Plotting only: all estimates are survey-weighted and come from 06_weighted.R and 07_weighted_boot.R.
-# Input: results/analysis/{analysis_data.rds, weighted/{figure2_std_curves, figure2_absrisk, figure2_ptrend, figureS3}.csv}
-# Output: results/figures/Figure2.{png,pdf}, FigureS3.{png,pdf}
 source(here::here("code", "analysis", "fig_common.R"))
 d <- readRDS(file.path(ANA, "analysis_data.rds"))
 QL <- paste0("Q", 1:4)
@@ -33,7 +28,7 @@ mk_thk <- function(FS) theme_classic(base_family = "Arial", base_size = FS) +
 thk <- mk_thk(FS)
 # temporarily switch the global font size (ftab / curve_grid read FS and thk when called)
 set_fs <- function(v) { FS <<- v; thk <<- mk_thk(v) }
-# x range fixed at 0–30.8 with coord_cartesian
+# x range fixed at 0-30.8 with coord_cartesian
 XS <- scale_x_continuous(breaks = seq(0, 30, 10), expand = c(0, 0))
 XC <- function(ylim) coord_cartesian(xlim = c(0, TMAX + .8), ylim = ylim, expand = FALSE, clip = "off")
 cap <- guides(x = guide_axis(cap = "both"), y = guide_axis(cap = "both"))
@@ -181,7 +176,7 @@ bar_plot <- function(o, lab = NULL, xtitle = TRUE, rdlab = TRUE) {
       size = (FS - .5) / .pt, family = "Arial", colour = INK)
   p0
 }
-# one outcome per row, bars left and curves right; panel letters A–F in reading order
+# one outcome per row, bars left and curves right; panel letters A-F in reading order
 # panels too short for long titles; the outcome is named by the y-axis title of the bar chart in the same row
 YTR <- c(allcause = "Cumulative mortality (%)", cvd = "Cumulative incidence (%)", cancer = "Cumulative incidence (%)")
 fig2_grid <- function() {

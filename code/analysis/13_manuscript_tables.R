@@ -1,5 +1,3 @@
-# Manuscript tables as HTML fragments: Table 1, Table S1 (backbone performance) and Table S3 (characteristics by KSAA quartile).
-# Input: results/analysis/*.csv and the out-of-fold predictions. Output: results/analysis/tables/{table1,tableS1,tableS3}.html
 res <- here::here("results"); ana <- file.path(res, "analysis"); td <- file.path(ana, "tables")
 dir.create(td, showWarnings = FALSE)
 mi <- function(x) gsub("-", "−", x, fixed = TRUE)
@@ -29,7 +27,7 @@ met <- function(p, a) {
   e <- p - a
   c(MAE = mean(abs(e)), RMSE = sqrt(mean(e^2)), CS5 = 100 * mean(abs(e) <= 5), r = cor(p, a), R2 = 1 - sum(e^2) / sum((a - mean(a))^2))
 }
-fm <- function(p) {   # mean ± SD over the five held-out folds
+fm <- function(p) {   # mean +/- SD over the five held-out folds
   m <- sapply(0:4, function(k) met(p[d$fold == k], d$age[d$fold == k]))
   c(sprintf("%s ± %s", f(mean(m["MAE", ]), 2), f(sd(m["MAE", ]), 2)), sprintf("%s ± %s", f(mean(m["RMSE", ]), 2), f(sd(m["RMSE", ]), 2)),
     sprintf("%s ± %s", f(mean(m["CS5", ]), 1), f(sd(m["CS5", ]), 1)), sprintf("%s ± %s", f(mean(m["r", ]), 3), f(sd(m["r", ]), 3)))
@@ -115,7 +113,7 @@ body <- c(hdr("Demographics and socioeconomic status", 2),
   brow("Current alcohol use", as.integer(d1$alc3 == "current")),
   brow("Physically inactive in leisure time", as.integer(d1$pa3 == "inactive")),
   mrow("Body mass index, kg/m²", d1$bmi, 1), brow("Hypertension", d1$htn), brow("Diabetes", d1$dm),
-  mrow("Total cholesterol, mmol/L", d1$tc / 38.67, 2), mrow("HDL cholesterol, mmol/L", d1$hdl / 38.67, 2),   # SI units (mg/dL ÷ 38.67)
+  mrow("Total cholesterol, mmol/L", d1$tc / 38.67, 2), mrow("HDL cholesterol, mmol/L", d1$hdl / 38.67, 2),   # SI units (mg/dL / 38.67)
   mrow("eGFR, mL/min/1.73 m²", d1$egfr, 1),
   brow("History of cardiovascular disease", d1$cvd_hist), brow("History of cancer", d1$cancer_hist),
   hdr("Knee skeletal age and comparison measures", 2),

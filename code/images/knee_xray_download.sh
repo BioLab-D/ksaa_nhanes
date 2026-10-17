@@ -1,8 +1,4 @@
 #!/bin/bash
-# Download the NHANES III knee radiographs listed in MANIFEST (file name and CDC byte size, tab-separated).
-# Repeats wget -c passes until every file has the listed size. --no-check-certificate was needed behind a TLS-intercepting
-# proxy; file sizes are checked instead (also check the TIFF header, since such proxies can return HTML pages).
-
 DIR=/home/data/knee_xray
 MANIFEST=/home/data/knee_xray_manifest.tsv
 LOG=/home/data/knee_xray_finish.log

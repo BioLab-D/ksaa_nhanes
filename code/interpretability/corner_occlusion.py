@@ -1,9 +1,3 @@
-# Corner occlusion test: Grad-CAM weight was concentrated in the two upper image corners, so check whether predictions depend on them.
-#   Same models, preprocessing, blur (sigma 16 px at 448) and ensemble weights as saliency.py --occlude; internal validation set (487).
-#   Conditions (both knees, 64 x 64 px): none; each corner; both upper corners; all four; control = left and right mid-edge patches.
-# Output: results/analysis/saliency/occlusion_corners_heldout.csv, corner_occlusion_summary.txt (change in MAE and mean shift,
-#   participant-level bootstrap 95% CI)
-# Run: python code/interpretability/corner_occlusion.py --bs 1
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

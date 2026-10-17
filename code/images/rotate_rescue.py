@@ -1,10 +1,3 @@
-"""Rotate films without a valid detection by +-90 degrees and run the detector again.
-
-Rotation was the main cause of failed detection: the detector, trained on upright films, finds no knee on rotated ones.
-These films are kept rather than excluded because they include knee replacements, and excluding them would bias the
-sample with respect to skeletal health. The direction with exactly one right and one left knee side by side and the
-higher mean confidence is kept.
-"""
 import os, csv, numpy as np
 from PIL import Image
 from ultralytics import YOLO
@@ -55,7 +48,7 @@ for i, r in enumerate(fails):
 
 n = len(out)//2
 print(f"\nrescued {n} / {len(fails)}  ({n/len(fails):.1%})")
-print(f"  clockwise 90°: {saved['90']}   counterclockwise 90°: {saved['270']}")
+print(f"  clockwise 90 deg: {saved['90']}   counterclockwise 90 deg: {saved['270']}")
 print(f"  still failed: {len(fails)-n}")
 with open(f"{SRC}/boxes_rot.csv","w",newline="") as f:
     w = csv.DictWriter(f, fieldnames=["stem","rot","side","cx","cy","w","h","conf"])

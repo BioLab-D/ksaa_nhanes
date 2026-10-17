@@ -1,9 +1,3 @@
-# Grad-CAM of predicted age from the 5 full-data models (visualization only; KSAA is always the cross-fitted value).
-#   Preprocessing and readout as in code/model/knee_v2.py (mean expected age of the two knees' local heads, no sampling).
-#   Grad-CAM uses each backbone's last feature map, sums to 1 per knee, and is averaged with inverse internal-validation MAE weights.
-#   --occlude: re-predict with each of the 6 anatomical regions Gaussian-blurred (sigma 16 px at 448; fewer edges than a constant fill).
-# The full-data models nearly memorize their training participants, so results use --heldout (487 participants not used for training).
-# Run: python code/interpretability/saliency.py --heldout --bs 8 [--occlude]; output in results/analysis/saliency/
 import os, sys, csv, time, argparse, numpy as np
 os.environ["N_VIEWS"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

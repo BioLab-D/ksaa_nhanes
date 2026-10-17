@@ -1,5 +1,3 @@
-# Per-knee K-L grade from the NHANES III radiograph file (data/raw/nhanes3_xray/xr.dat, not shipped)
-# Output: results/work/kl_per_knee.csv (radiographic OA = K-L >= 2)
 sp <- here::here("results", "work")
 L  <- readLines(here::here("data", "raw", "nhanes3_xray", "xr.dat"), warn=FALSE)
 cc <- function(a,b) as.numeric(substr(L,a,b))

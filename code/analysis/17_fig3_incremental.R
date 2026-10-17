@@ -1,9 +1,3 @@
-# Figure 3: incremental prognostic value of KSAA beyond Phenotypic Age acceleration.
-#   A, per-SD HRs with both in the model; B, Harrell's C and R²_D before and after adding KSAA, with relative gains;
-#   C-E, HRs in cells cross-classified by the quartiles of both (reference Q1 x Q1).
-# n = 4,522 (PhenoAge available). C and R²_D are apparent values (no optimism correction); CIs from replicate-weight bootstrap.
-# Input: results/analysis/weighted/{figure3a, figure3b_cindex, figure3_cells, figure3_within}.csv
-# Output: results/figures/Figure3.{png,pdf}
 source(here::here("code", "analysis", "fig_common.R"))
 OUT3 <- c("All-cause", "Cardiovascular", "Cancer")
 norm_out <- function(x) factor(sub(" mortality$", "", sub("^CVD", "Cardiovascular", x)), OUT3)
@@ -76,7 +70,7 @@ pc <- fbase(LA, c(0.45, 3.75)) +
         # centered on the forest area; top margin aligns it with the axis title of B
         axis.title.x = element_text(hjust = log(XHI / XLO) / (2 * log(XMAX / XLO)), margin = margin(t = 3.2)))
 
-# ---- B: Harrell's C and R²_D of the base model (age + sex + PhenoAge acceleration) and with KSAA; relative gains on the right ----
+# ---- B: Harrell's C and R2_D of the base model (age + sex + PhenoAge acceleration) and with KSAA; relative gains on the right ----
 #   CIs from 200 bootstrap replicates, refitting both models in each replicate.
 MC <- "Harrell\u2019s C"; MR <- "Explained variation, R\u00b2"
 mkb <- function(est, lo, hi, m, ser) data.frame(o = CI7$o, est = est, lo = lo, hi = hi, m = m, s = ser)
@@ -187,9 +181,9 @@ save_fig(p, "Figure3", FW, FH)
 
 cat("\nPanel values (n = 4,522; combined-score values are apparent, without optimism correction)\n")
 for (i in seq_len(nrow(CI7))) with(CI7[i, ],
-    cat(sprintf("  a %-15s C PhenoAge %.4f -> combined %.4f  ΔC %+.4f (%+.4f, %+.4f)  relative %+.2f%% (%+.2f%%, %+.2f%%)\n",
+    cat(sprintf("  a %-15s C PhenoAge %.4f -> combined %.4f  dC %+.4f (%+.4f, %+.4f)  relative %+.2f%% (%+.2f%%, %+.2f%%)\n",
   as.character(o), C_pa, C_cb, dC_vs_pa, dC_vs_pa_lo, dC_vs_pa_hi, relC, relC_lo, relC_hi)))
-for (i in seq_len(nrow(CI7))) with(CI7[i, ], cat(sprintf("  b %-15s R²_D PhenoAge %.3f -> combined %.3f  relative %+.1f%% (%+.1f%%, %+.1f%%)\n",
+for (i in seq_len(nrow(CI7))) with(CI7[i, ], cat(sprintf("  b %-15s R2_D PhenoAge %.3f -> combined %.3f  relative %+.1f%% (%+.1f%%, %+.1f%%)\n",
   as.character(o), R2_pa, R2_cb, relR2, relR2_lo, relR2_hi)))
 for (i in seq_len(nrow(WD))) with(WD[i, ], cat(sprintf("  d %-15s KSAA %s | PhenoAge %s | Wald P %.2g\n", as.character(o),
   ci(hr_ksaa, lo_ksaa, hi_ksaa), ci(hr_pa, lo_pa, hi_pa), p_diff)))
@@ -200,6 +194,6 @@ for (tg in c("main", "main_cvd")) { g <- JC[JC$panel == tg, ]; w <- JW[JW$panel 
   h <- qhet(w)
   cat(sprintf("  %s heterogeneity across quartiles Cochran Q = %.2f, P = %.2f\n", if (tg == "main") "e" else "f", h[["Q"]], h[["p"]]))
   q4 <- g[g$y == "Q4" & g$x == "Q4", ]
-  cat(sprintf("  %s %-9s Q1×Q1 %s, Q4×Q4 %s, reference Q1×Q1; %d–%d participants and %d–%d deaths per cell; KSAA per SD within quartiles: %s\n",
+  cat(sprintf("  %s %-9s Q1xQ1 %s, Q4xQ4 %s, reference Q1xQ1; %d-%d participants and %d-%d deaths per cell; KSAA per SD within quartiles: %s\n",
               if (tg == "main") "e" else "f", if (tg == "main") "all-cause" else "cardiovascular", f2(g$hr[g$y == "Q1" & g$x == "Q1"]),
               ci(q4$hr, q4$hr_lo, q4$hr_hi), min(g$n), max(g$n), min(g$deaths), max(g$deaths), paste(ci(w$hr, w$lo, w$hi), collapse = " / "))) }

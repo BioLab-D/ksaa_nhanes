@@ -1,13 +1,3 @@
-"""Build a bootstrap training set for the YOLO knee detector from heuristic boxes.
-
-Input: whole bilateral knee film (downsampled to 1024 px); output: two boxes (class 0 = participant's right knee,
-1 = left knee). The joint row is located from the intensity profile (correct in 24 of 24 films checked); box size is less
-reliable, which is what review and detector training are meant to correct.
-
-A suspicion score orders the films for review:
-  - weak joint-space dip in the detrended profile (joint row unreliable)
-  - large difference between the left and right joint rows (at least one side wrong)
-"""
 import os, sys, glob, random, csv, numpy as np
 from multiprocessing import Pool
 from PIL import Image, ImageDraw

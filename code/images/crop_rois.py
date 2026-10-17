@@ -1,9 +1,3 @@
-"""Crop knee ROIs from the original 16-bit TIFFs using the detection boxes.
-
-ROIs are kept at 16 bits so that the grey-level window can be chosen at training time rather than fixed here.
-The box is enlarged 1.15 x for anatomical context; regions beyond the film edge are edge-padded, not zero-padded,
-to avoid artificial edges at the ROI border.
-"""
 import os, csv, numpy as np
 from multiprocessing import Pool
 from PIL import Image

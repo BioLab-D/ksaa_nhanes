@@ -1,6 +1,3 @@
-# Fracture, fall and physical function variables for Table 1, Table S10 and the PheWAS.
-# Fracture HAG5A-C (8/9 missing), low-energy fracture HAG10A-F, fall HAG14, activity difficulty HAH >= 2, tandem stand < 10 s.
-# Input: results/analysis/analysis_data.rds, results/work/{fracture,physfun}.csv. Output: results/analysis/fxf_vars.csv
 res <- here::here("results"); out <- file.path(res, "analysis"); sp <- file.path(res, "work")
 d <- readRDS(file.path(out, "analysis_data.rds"))
 FR <- read.csv(file.path(sp, "fracture.csv")); PF <- read.csv(file.path(sp, "physfun.csv"))

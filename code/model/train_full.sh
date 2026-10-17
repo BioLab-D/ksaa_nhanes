@@ -1,8 +1,4 @@
 #!/bin/bash
-# Train each of the five backbones once on all 4,875 participants (same recipe as train_5fold.sh; 10% internal validation
-# for early stopping) and save the checkpoints for use on new radiographs. Manuscript results use the out-of-fold predictions,
-# not these models. Ensemble weights and bias correction for these checkpoints come from the out-of-fold predictions
-# (data/derived/new_data_calibration.csv), not from their in-sample predictions. A failed run is retried once. Usage: bash train_full.sh
 export TORCH_HOME=/home/data/torch PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True N_VIEWS=2 DROP=0 NO_ALBUMENTATIONS_UPDATE=1
 PY=${PY:-python}; cd /tmp/mammo_age_official; D=/home/data/knee_yolo/v2; W=$D/weights; mkdir -p $W
 F='grep --line-buffered -vE check_version|fetch_version|validated_self|UserWarning|data.=.fetch'

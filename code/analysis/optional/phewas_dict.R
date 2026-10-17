@@ -1,10 +1,3 @@
-# Code dictionary of the NHANES III adult, exam and lab files, used by 08_phewas_clean.R to recognise missing codes.
-#   Fill codes (88, 888, ...) depend on field width and can be valid values (e.g. 88 for ALP or MCV), so each variable's
-#   codes, labels and frequencies are read from the codebook PDFs and missing codes are identified by label.
-#   Codebook frequencies are checked against counts in DuckDB; variables that do not match are excluded.
-# Input: data/raw/nhanes3/{adult,exam,lab}.sas, data/raw/nhanes3/docs/{adult,exam,lab}-acc.pdf (not shipped; needs pdftotext)
-# Output: results/analysis/phewas/phewas_codes.csv (one row per variable and code), phewas_vars.csv, phewas_dict_check.csv
-# Run from the repository root: Rscript code/analysis/optional/phewas_dict.R
 suppressMessages({library(DBI); library(duckdb)})
 raw <- here::here("data", "raw", "nhanes3")
 out <- here::here("results", "analysis", "phewas")

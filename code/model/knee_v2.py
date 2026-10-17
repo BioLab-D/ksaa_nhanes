@@ -1,37 +1,3 @@
-"""Knee age model: Mammo-AGE adapted to bilateral knee radiographs, trained under participant-level five-fold cross-fitting.
-
-Defaults reproduce a direct port of the official Mammo-AGE recipe; each knee-specific change is a switch.
-The configuration used in the manuscript is in train_5fold.sh (section 1).
-  --aug official|knee      knee: no elastic/grid/optical distortion or median blur; geometry (rotation ±5°, shift ≤5%,
-                           scale 0.95-1.05, p 0.5) drawn per knee; brightness/contrast (±10%, p 0.5), gamma (0.9-1.1, p 0.3)
-                           and 3x3 Gaussian blur (p 0.15) shared by both knees of a film; Gaussian noise (SD 0.007-0.012, p 0.2)
-                           with shared strength, sampled per knee; CoarseDropout (8 holes, side 10%, p 0.2) per knee
-  --norm minmax8|pct|global  minmax8: per-image min-max to uint8; pct: per-image [P0.5, P99.5] mapped to [0,1];
-                           global: [P0.5, P99.5] of training-fold pixels mapped to [0,1]. pct and global are then
-                           standardized by the training-fold pixel mean and SD
-  --sched step|cosine      step: Adam, no weight decay, lr x0.1 at epochs 20/40/60/80; cosine: AdamW (--wd), linear warm-up
-                           for --warmup epochs, then per-step cosine decay
-  --fusion tf|concat|mean|gate  tf: Mammo-AGE instance-bag transformer (--nblock blocks); concat: Mammo-AGE POE baseline
-                           (pooled features concatenated, no local heads); mean / gate: mean or gated-attention pooling
-                           (Ilse et al. 2018) with one local head shared by both knees
-  --lam_local              weight of the local-head losses (1: L_global + L_R + L_L)
-  --primary local|global   readout used for early stopping and pred_age (local: mean expected age of the two knee heads)
-  --min_age/--num_output   POE age classes (default 0-99)
-  --reg [--no_poe]         scalar L1 regression on age centred at the training-fold mean; --no_poe drops POE sampling
-  --no_mirror              do not mirror left knees to the right-knee orientation
-  --views both|R|L         single-knee model (requires mean or gate)
-  --no_cross               transformer without cross-attention (requires --fusion tf and --nblock >= 1)
-  --no_density             zero the output of the Mammo-AGE density branch. There are no density labels here, and the
-                           branch feeds features of both knees into every local head; zeroing it is needed for a local
-                           head to see one knee only
-  --folds                  outer folds to run;  --smoke N: one epoch on N participants, no outputs
-Outer folds are set by --split_seed, independently of the training seed --seed. Participants need ROIs of both knees.
-Three participants with only a second film (K2) are assigned to folds separately, so the folds of the other participants
-do not depend on them; they are never used for internal validation.
-Outputs in /home/data/knee_yolo/v2: {tag}_folds.csv (fold, inner_val_mae, best_ep, stop_ep, minutes) and, in blind/,
-{tag}_oof.csv (held-out predictions of each readout) and {tag}_holdout.csv (held-out MAE). The log reports internal-validation
-MAE only; blind/ was not opened until all backbones had been trained.
-"""
 import os, re, csv, glob, math, random, argparse, time, numpy as np, cv2
 os.environ.setdefault("N_VIEWS", "2")
 import torch, torch.nn as nn
@@ -97,7 +63,7 @@ if Aa.views != "both":
     assert Aa.fusion in ("mean", "gate"), "single-knee models require mean/gate (official modules are built for N_VIEWS=2)"
 VS = ["L", "R"] if Aa.views == "both" else [Aa.views]
 if Aa.no_cross:
-    assert Aa.fusion == "tf" and Aa.nblock >= 1, "--no_cross applies only to the official transformer with N ≥ 1"
+    assert Aa.fusion == "tf" and Aa.nblock >= 1, "--no_cross applies only to the official transformer with N >= 1"
     import transformer as _T
     def _self_only(self, local_feats, global_feat):
         """Instance_bag_transformer.forward with the cross-attention output set to zero, so the knees do not interact."""

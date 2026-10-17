@@ -1,8 +1,3 @@
-"""Crop ROIs of the films rescued by rotation (boxes_rot.csv).
-
-Box coordinates refer to the rotated image, so each TIFF is first rotated with the same PIL rotate() call as in
-rotate_rescue.py (angle in the rot column).
-"""
 import os, csv, numpy as np
 from multiprocessing import Pool
 from PIL import Image

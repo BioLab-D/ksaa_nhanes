@@ -1,9 +1,3 @@
-# Partial correlations of KSAA with radiographic reading features (K-L grade, osteophytes, sclerosis, chondrocalcinosis, joint
-# replacement, radiographic OA, knee pain) and proximal femur DXA, plus each feature's own Model 3 HR for all-cause mortality.
-# Partial r = correlation of residuals after regressing both on Model 3 covariates; CI by Fisher z with SE = 1/sqrt(n - 3 - k).
-# Reading features: sum of the 4 compartments, worse knee; codes 8/9 missing. Bonferroni over the 5 reading features (FEATP).
-# Input: results/analysis/analysis_data.rds, results/work/{xray_components,dxa_all}.csv
-# Output: results/analysis/kl_dxa_partial_cor.csv
 suppressMessages(library(survival))
 res <- here::here("results"); ana <- file.path(res, "analysis"); spw <- file.path(res, "work")
 d <- readRDS(file.path(ana, "analysis_data.rds")); SDG <- sd(d$gap); d$z <- d$gap / SDG

@@ -1,5 +1,4 @@
 #!/bin/bash
-# Preprocessing: PNG conversion -> knee detection -> ROI cropping. Existing outputs are skipped, so the script can be rerun.
 PY=${PY:-python}
 cd /home/data/knee_yolo/work || exit 1
 

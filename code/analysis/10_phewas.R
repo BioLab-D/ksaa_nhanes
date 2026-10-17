@@ -1,14 +1,3 @@
-# PheWAS: survey-weighted scan of the phenotypes in the audit table (09_phewas_audit.R), KSAA -> phenotype.
-# One model per phenotype: KSAA per SD + age, sex, race/ethnicity, education and PIR. Continuous: svyglm Gaussian
-#   (log-transformed if skewed, then standardized); binary: quasibinomial; ordinal: svyolr (levels < 30 merged into a
-#   neighbour); nominal: reverse joint test, P only.
-# Design: WTPFEX6, SDPPSU6, SDPSTRA6; fasting-subsample measures use WTPFSD6; reproductive items in women only.
-#   Subsets always via subset(design). P and CI use t with design df (49; 23 for a single phase).
-# Replication: each phase fitted with its own design; replicated = same direction and P < 0.05 in both phases.
-# Multiple testing: BH-FDR, Bonferroni and Li-Ji, separately for main, supplementary and extended-module sets.
-# Input: results/analysis/{analysis_data.rds, fxf_vars.csv}, results/analysis/phewas/{phewas_clean.rds, phewas_audit_table.csv,
-#   phewas_multilevel_plan.csv}
-# Output: results/analysis/phewas/phewas_results.csv, phewas_y.rds, phewas_summary.txt
 suppressMessages({library(survey); library(MASS); library(DBI); library(duckdb)})
 options(survey.lonely.psu = "adjust")
 res <- here::here("results")

@@ -1,6 +1,3 @@
-# Tables S8 (audit of the variables in the main scan) and S9 (all main-analysis phenotypes)
-# Input: results/analysis/phewas/{phewas_results.csv, phewas_audit_table.csv}
-# Output: results/analysis/tables/{tableS8,tableS9}.html
 res <- here::here("results")
 ana <- file.path(res, "analysis")
 td <- file.path(ana, "tables")
@@ -8,7 +5,7 @@ ew <- file.path(ana, "phewas")
 source(here::here("code", "analysis", "phewas_labels.R"))
 mi <- function(x) gsub("-", "−", x, fixed = TRUE)
 f <- function(x, d = 2) ifelse(is.na(x), "", mi(sub("^-(0\\.0+)$", "\\1", formatC(round(x + sign(x) * 1e-9, d), format = "f", digits = d))))
-# separator chosen from displayed values (as ciD in 13_manuscript_tables.R): " to " if either end is shown negative, otherwise "–"
+# separator chosen from displayed values (as ciD in 13_manuscript_tables.R): " to " if either end is shown negative, otherwise "-"
 ci <- function(h, l, u, d = 2) {
   lo <- f(l, d)
   hi <- f(u, d)

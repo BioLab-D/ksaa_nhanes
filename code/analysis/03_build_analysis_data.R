@@ -1,6 +1,3 @@
-# Build the analysis data set (analysis_data.rds): outcomes, Phenotypic Age, covariates, K–L grade, BMD, physical function.
-# Input: results/ksaa_oof.csv, results/predictions/cv_*.csv, results/work/*.csv, data/nhanes3/nhanes3_knee_cohort.duckdb
-# Output: results/analysis/analysis_data.rds
 suppressMessages(library(duckdb))
 res <- here::here("results"); sp <- file.path(res, "work"); out <- file.path(res, "analysis")
 dir.create(out, showWarnings = FALSE)
@@ -30,8 +27,8 @@ d$t <- sl$PERMTH_EXM[i]; d$e <- sl$MORTSTAT[i]; d$ucod <- sl$UCOD_LEADING[i]; d$
 d$e_cvd <- as.integer(d$e == 1 & d$ucod %in% c(1, 5)); d$e_cancer <- as.integer(d$e == 1 & d$ucod %in% 2)
 cat(sprintf("Cohort n %d; deaths %d (no cause %d); CVD deaths %d; cancer deaths %d\n",
             nrow(d), sum(d$e), sum(d$e == 1 & is.na(d$ucod)), sum(d$e_cvd), sum(d$e_cancer)))
-cat(sprintf("BMI range %s, femoral neck BMD range %s\n", paste(range(d$bmi, na.rm = TRUE), collapse = "–"),
-            paste(round(range(d$fnbmd, na.rm = TRUE), 3), collapse = "–")))
+cat(sprintf("BMI range %s, femoral neck BMD range %s\n", paste(range(d$bmi, na.rm = TRUE), collapse = "-"),
+            paste(round(range(d$fnbmd, na.rm = TRUE), 3), collapse = "-")))
 
 # ---------------- NHANES III source variables ----------------
 con <- dbConnect(duckdb::duckdb(), here::here("data", "nhanes3", "nhanes3_knee_cohort.duckdb"), read_only = TRUE)
@@ -142,7 +139,7 @@ cat(sprintf("Fasting >=8 h: %d (%.0f%%); metabolic syndrome criteria met %s\n", 
 
 # ---------------- Musculoskeletal and inflammation ----------------
 kl <- read.csv(file.path(res, "work", "kl_per_knee.csv"))
-cat(sprintf("K–L values: %s\n", paste(names(table(kl$kl)), table(kl$kl), sep = ":", collapse = "  ")))
+cat(sprintf("K-L values: %s\n", paste(names(table(kl$kl)), table(kl$kl), sep = ":", collapse = "  ")))
 klp <- aggregate(kl ~ seqn, kl[kl$kl %in% 0:4, ], max); d$klmax <- klp$kl[match(d$SEQN, klp$seqn)]
 d$oa <- as.integer(d$klmax >= 2); d$severe_oa <- as.integer(d$klmax >= 3)
 KP <- read.csv(file.path(sp, "knee_pain.csv")); d$pain <- yn(q(KP$HAG22[match(d$SEQN, KP$SEQN)]))
@@ -220,4 +217,4 @@ cat(sprintf("  inactive vs other %.2f; current drinking vs other %.2f; current s
             exp(10 * coef(glm(I(smk3 == "current") ~ age, binomial, d))[2])))
 
 saveRDS(d, file.path(out, "analysis_data.rds"))
-cat(sprintf("\n-> %s (%d × %d)\n", file.path(out, "analysis_data.rds"), nrow(d), ncol(d)))
+cat(sprintf("\n-> %s (%d x %d)\n", file.path(out, "analysis_data.rds"), nrow(d), ncol(d)))

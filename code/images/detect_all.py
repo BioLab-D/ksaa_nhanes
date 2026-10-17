@@ -1,8 +1,3 @@
-"""Run the knee detector on all 4,908 films and write box coordinates and a quality category.
-
-Boxes are stored as fractions of the film size, so they map directly onto the original TIFF.
-A film is "ok" when exactly one right and one left knee are detected side by side; all others go to the review list.
-"""
 import os, glob, csv, numpy as np
 from ultralytics import YOLO
 SRC = "/home/data/knee_yolo"

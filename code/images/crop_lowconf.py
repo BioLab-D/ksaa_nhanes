@@ -1,9 +1,3 @@
-"""Crop ROIs of the films rescued with relaxed detection thresholds (boxes_lowconf.csv).
-
-boxes_lowconf.csv has one row per film with columns for each knee, and coordinates refer to the unrotated TIFF.
-Cropping follows crop_rois.py (square box 1.15 x bone width, 512 px, 16-bit), so these 107 films have the same ROI scale
-as the rest of the sample.
-"""
 import os, csv, numpy as np
 from multiprocessing import Pool
 from PIL import Image

@@ -1,5 +1,3 @@
-# Demographics, covariates and linked mortality of the imaging cohort from the NHANES III DuckDB
-# Input: data/nhanes3/nhanes3_knee_cohort.duckdb; output: results/work/surv_labels.csv
 suppressMessages(library(duckdb))
 sp <- here::here("results", "work")
 con <- dbConnect(duckdb::duckdb(),here::here("data", "nhanes3", "nhanes3_knee_cohort.duckdb"),read_only=TRUE)

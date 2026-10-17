@@ -1,9 +1,3 @@
-# Figure 4: draws panel A with clarite.plot.manhattan and combines it with panel B (drawn by 18_fig4_phewas.R).
-#   CLARITE defaults are kept (alphabetical categories, alternating gray/white bands, FDR 5% line, labels right of points);
-#   only the layout is adjusted (font size, axis ranges, label overlap, category colors matching panel B).
-# Input: results/figures/Figure4A.csv and Figure4B.{png,pdf} from 18_fig4_phewas.R
-# Output: results/figures/Figure4A.{png,pdf}, Figure4.{png,pdf}
-# Run: $CLARITE_PY code/analysis/19_fig4_phewas_clarite.py . (CLARITE 2.3.6 needs Python <= 3.10, plus Pillow and PyMuPDF)
 import sys
 import numpy as np
 import pandas as pd

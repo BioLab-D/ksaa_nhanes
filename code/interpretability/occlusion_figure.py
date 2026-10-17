@@ -1,8 +1,3 @@
-# Fig. S2: occlusion sensitivity maps of the six example right knees (occlusion_map.py), in the layout of the Grad-CAM examples.
-#   Maps are lightly smoothed for display (sigma 2 grid cells = 8 px at 448) and share one color scale (99.5th percentile).
-# Input: results/analysis/saliency/{occlusion_map_examples.npz, ksaa_for_saliency.csv}, ROI images
-# Output: results/figures/FigureS2.{png,pdf}
-# Run: python code/interpretability/occlusion_figure.py
 import os, sys, csv, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from saliency_common import KB, OUT, roi_file, pre
@@ -58,6 +53,6 @@ cb.outline.set_linewidth(0.4)
 cb.ax.tick_params(labelsize=6, width=0.4, length=2)
 cb.set_label("Change in predicted age\nwhen the region is blurred (years)", fontsize=6.5, color=INK, labelpad=3)
 for ext in ("png", "pdf"): fig.savefig(os.path.join(FIGD, f"FigureS2.{ext}"), dpi=300)
-print(f"common scale: 0 to {VMAX:.2f} years (99.5th percentile over the six maps); per-map max |Δ| "
+print(f"common scale: 0 to {VMAX:.2f} years (99.5th percentile over the six maps); per-map max |change| "
       + ", ".join(f"{M[p].max():.2f}" for p in range(len(SEQ))))
 print("-> results/figures/FigureS2.{png,pdf}")

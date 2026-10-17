@@ -1,9 +1,3 @@
-# Grad-CAM summaries and example figure (supporting analyses; Fig. S2 itself is drawn by occlusion_figure.py).
-#   Reports the correlation of the age and KSAA difference maps (null: KSAA permuted within age strata), enrichment of the
-#   6 anatomical regions, and the MAE increase after region occlusion (bootstrap CI). Examples: 3 same-sex pairs, ages within 1 year.
-# Input: outputs of saliency_images.py and saliency.py --heldout [--occlude] in results/analysis/saliency/
-# Output: saliency_summary.txt, saliency_regions.csv, results/figures/gradcam_examples.{png,pdf}
-# Run: python code/interpretability/saliency_figure.py
 import os, sys, csv, numpy as np, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt, matplotlib.gridspec as gridspec, torch, torch.nn.functional as F
@@ -37,7 +31,7 @@ sex = np.array([int(r["sex"]) for r in rows])
 # same as R quantile (type 7)
 qc = np.quantile(gap, [.25, .5, .75])
 Q = np.digitize(gap, qc)
-band = np.minimum(((age - 60) // 5).astype(int), 5)                                     # 60–64 … 85–90
+band = np.minimum(((age - 60) // 5).astype(int), 5)                                     # 60-64 ... 85-90
 yng, old = age < 65, age >= 80
 def std_means(a, b, idx=None):
     """Means of groups a and b within 5-year age strata, weighted by the combined stratum size (age-standardized). idx: bootstrap sample indices."""

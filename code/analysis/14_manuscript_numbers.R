@@ -1,7 +1,3 @@
-# In-text numbers not printed by other scripts: follow-up of the cohort, and the MAE of a trivial baseline (median age of the
-# training folds) compared with the ensemble.
-# Input: results/ksaa_oof.csv, results/work/surv_labels.csv
-# Output: console (results/logs/14_manuscript_numbers.txt)
 suppressMessages(library(survival))
 res <- here::here("results")
 d <- read.csv(file.path(res,"ksaa_oof.csv"))
@@ -16,6 +12,6 @@ cat(sprintf("n %d; deaths %d (%.1f%%); person-years %.0f; median follow-up %.1f 
 cat("\n=========== 2. Trivial baseline ===========\n")
 bm <- sapply(0:4, function(k){ tr <- d$fold!=k; te <- d$fold==k; mean(abs(median(d$age[tr]) - d$age[te])) })
 rm <- sapply(0:4, function(k){ te <- d$fold==k; mean(abs(d$pred_raw[te]-d$age[te])) })
-cat(sprintf("  Training-fold median prediction MAE %.3f ± %.3f; raw ensemble %.3f; relative reduction %.1f%%\n",
+cat(sprintf("  Training-fold median prediction MAE %.3f +/- %.3f; raw ensemble %.3f; relative reduction %.1f%%\n",
             mean(bm), sd(bm), mean(rm), 100*(1-mean(rm)/mean(bm))))
 cat(sprintf("  Pooled OOF: raw r %.3f; corrected r %.3f\n", cor(d$pred_raw, d$age), cor(d$pred_corr, d$age)))

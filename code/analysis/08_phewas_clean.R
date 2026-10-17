@@ -1,17 +1,3 @@
-# PheWAS candidate cleaning: per-variable counts for the audit (09_phewas_audit.R) and cleaned phenotypes for 10_phewas.R; no models.
-# Missing codes are handled per variable using the codebook entries read by phewas_dict.R:
-#   (1) values not listed in the codebook -> missing ("Don't know" in several *S variables is 9998 in the data, not 9999 as in the codebook);
-#   (2) labels such as Blank but applicable / Don't know / Refused / Could not be assessed -> missing;
-#   (3) "Less than 1 ..." in continuous variables -> 0.5 units ("less than one half hour" -> 0.25; "less than the
-#       lowest possible" -> half the lower bound);
-#   (4) "Never" -> 0 in frequency items but missing in "how long ago / at what age" items; "Says can't do",
-#       "Skinfold too large", etc. -> missing.
-# Candidates: numeric columns (the demographic block shared by the three files is taken once, from adult). Excluded: weights and
-#   design variables, administrative fields, tooth-surface and periodontal-site codes, SI-unit duplicates, the covariates,
-#   codebook check failures, and a manual list with reasons (EXCL_MANUAL). Inclusion thresholds are applied in 09_phewas_audit.R.
-# Input: results/analysis/analysis_data.rds, results/analysis/phewas/phewas_{vars,codes,dict_check}.csv,
-#   data/nhanes3/nhanes3_knee_cohort.duckdb
-# Output: results/analysis/phewas/phewas_audit_counts.csv, phewas_clean.rds
 suppressMessages({library(DBI); library(duckdb)})
 res <- here::here("results")
 out <- file.path(res, "analysis")

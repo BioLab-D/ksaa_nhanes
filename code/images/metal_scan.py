@@ -1,11 +1,3 @@
-"""Scan all ROIs for metal implants.
-
-Review of the rescued films showed many knee replacements, screws and plates. Excluding these films would remove
-participants with severe OA who had access to surgery, so the scan checks whether metal is concentrated among them.
-
-Metal forms a saturated plateau, whereas the brightest bone gives only scattered pixels. The statistic is
-frac_top, the fraction of pixels >= 0.995 x the image maximum; no threshold is fixed in advance.
-"""
 import os, re, csv, glob, numpy as np
 from multiprocessing import Pool
 from PIL import Image

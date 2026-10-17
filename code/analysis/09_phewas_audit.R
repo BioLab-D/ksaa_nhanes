@@ -1,8 +1,3 @@
-# PheWAS variable audit (Table S8): assigns each candidate a status from its health meaning, duplication and overlap,
-#   eligible population and data quality. Effect sizes and P values are not used.
-# Status: main / supplementary / exposure_module (extended module) / covariate / excluded / review
-# Input: results/analysis/phewas/phewas_audit_counts.csv (08_phewas_clean.R), phewas_candidates.csv (candidate pool, from data/phewas/)
-# Output: results/analysis/phewas/phewas_audit_table.csv, one row per candidate
 ew <- here::here("results", "analysis", "phewas")
 A <- read.csv(file.path(ew, "phewas_audit_counts.csv"), stringsAsFactors = FALSE)
 cand <- read.csv(file.path(ew, "phewas_candidates.csv"), stringsAsFactors = FALSE)

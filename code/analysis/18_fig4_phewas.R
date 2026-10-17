@@ -1,8 +1,3 @@
-# Figure 4B (forest plot) and the data for 4A; 19_fig4_phewas_clarite.py draws 4A with CLARITE and combines the panels.
-#   B: top NTOP independent signals (FDR < 5% hits clumped at |r| > 0.7, ordered by P), per SD of KSAA; binary/ordinal
-#   phenotypes as OR (top block), continuous as SD difference (bottom block); numbers = rank, colors = health class.
-# Input: results/analysis/phewas/phewas_results.csv
-# Output: results/figures/Figure4A.csv, Figure4B.{png,pdf}
 source(here::here("code", "analysis", "fig_common.R"))
 source(here::here("code", "analysis", "phewas_labels.R"))
 # full figure is 183 mm wide, font size 5.2 pt (as in Figures 2 and 3); B is 3.15 in wide

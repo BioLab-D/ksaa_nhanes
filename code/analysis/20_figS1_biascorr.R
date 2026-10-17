@@ -1,7 +1,3 @@
-# Fig. S1: age-bias correction. A, whole cohort: age gap vs chronological age before and after correction (with marginal
-#   histograms) and absolute error vs age with a loess curve; B, the before/after scatter by survey phase.
-# Input: results/ksaa_oof.csv, results/work/surv_labels.csv
-# Output: results/figures/FigureS1.{png,pdf}
 suppressMessages({library(ggplot2); library(patchwork)})
 res <- here::here("results"); fig <- here::here("results", "figures")
 d <- read.csv(file.path(res,"ksaa_oof.csv"))
@@ -67,7 +63,7 @@ if (!file.exists(pdf_f) && capabilities("aqua")) tryCatch(ggsave(pdf_f, p, width
 cat(if (file.exists(pdf_f)) "  PDF written\n" else "  PDF not written\n")
 # console: bias-correction formulas (overall, by sex) and correlations
 f0 <- lm(pred_raw~age, d); fm <- lm(pred_raw~age, d[d$sex==1,]); ff <- lm(pred_raw~age, d[d$sex==2,])
-cat(sprintf("gap~age r before correction %.3f, after %+.4f; E[raw|age] = %.2f + %.3f×age; men %.2f + %.3f×age; women %.2f + %.3f×age; corrected gap SD %.2f\n",
+cat(sprintf("gap~age r before correction %.3f, after %+.4f; E[raw|age] = %.2f + %.3fxage; men %.2f + %.3fxage; women %.2f + %.3fxage; corrected gap SD %.2f\n",
   cor(d$gap_raw,d$age), cor(d$gap,d$age), coef(f0)[1],coef(f0)[2], coef(fm)[1],coef(fm)[2], coef(ff)[1],coef(ff)[2], sd(d$gap)))
 for(p_ in 1:2){ dd <- d[d$phase==p_,]
   cat(sprintf("phase %d: r before correction %.3f, after %+.3f; corrected MAE %.2f\n", p_, cor(dd$gap_raw,dd$age),

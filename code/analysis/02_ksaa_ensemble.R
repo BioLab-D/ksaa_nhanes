@@ -1,9 +1,3 @@
-# KSAA: weighted ensemble of the five backbones' out-of-fold predictions, with age-bias correction fitted in the training folds.
-# Follows Mammo-AGE (Yan et al., Nat Commun 2025). Weights are proportional to 1 / internal-validation MAE in the training folds and are
-# applied only to that fold's held-out participants. Bias correction (Smith 2019): regress (pred - age) on age in the other four folds,
-# pred_corr = pred - (a * age + b). Sensitivity analysis: reference set limited to survivors with >= 10 years of follow-up.
-# Input: results/predictions/cv_<backbone>_{oof,folds}.csv, results/work/{surv_labels,validate_vars}.csv
-# Output: results/ksaa_oof.csv; performance and Cox models in the log
 suppressMessages(library(survival))
 res <- here::here("results")
 sp  <- here::here("results", "work")
@@ -27,7 +21,7 @@ FM <- sapply(A5, function(a){   # internal-validation MAE by fold
 })
 M <- do.call(cbind, cfg); stopifnot(!anyNA(M)); n <- nrow(d); K <- 0:4; age <- d$age
 
-cat("=========== 1. Within-fold weights (∝ 1/internal-validation MAE; fold k's held-out participants use only fold k's weights) ===========\n")
+cat("=========== 1. Within-fold weights (prop. to 1/internal-validation MAE; fold k's held-out participants use only fold k's weights) ===========\n")
 # Fold k uses only W[, k]: the five-fold mean weight w would include information from the held-out participants and is only reported.
 # Equal weights are a sensitivity analysis.
 W <- apply(FM, 1, function(m) (1/m)/sum(1/m)); rownames(W) <- names(cfg)
@@ -47,19 +41,19 @@ for(k in K){
   rs <- r[r$t >= 120,]; f2 <- lm(gap ~ age, rs); ABs[k+1,] <- coef(f2)
   d$pred_corr_s[te] <- d$pred_raw[te] - (coef(f2)[2]*age[te] + coef(f2)[1])
 }
-cat("Δbias = a·x + b, fitted in each fold's reference set:\n"); print(round(AB,3))
-cat(sprintf("Sensitivity (reference: survivors >=10 y, n≈%d/fold): a %.3f ± %.3f, b %.2f ± %.2f; r between the two corrections %.5f\n",
+cat("dbias = a*x + b, fitted in each fold's reference set:\n"); print(round(AB,3))
+cat(sprintf("Sensitivity (reference: survivors >=10 y, n~%d/fold): a %.3f +/- %.3f, b %.2f +/- %.2f; r between the two corrections %.5f\n",
     round(sum(d$t>=120)*0.8), mean(ABs[,2]), sd(ABs[,2]), mean(ABs[,1]), sd(ABs[,1]), cor(d$pred_corr, d$pred_corr_s)))
 d$gap_raw <- d$pred_raw - age; d$gap <- d$pred_corr - age
 
-cat("\n=========== 3. Prediction performance (mean ± SD over the five folds) ===========\n")
+cat("\n=========== 3. Prediction performance (mean +/- SD over the five folds) ===========\n")
 met <- function(p, i){
   e <- p[i]-age[i]
   c(MAE=mean(abs(e)), CS5=100*mean(abs(e)<=5), r=cor(p[i],age[i]), rs=cor(p[i],age[i],method="spearman"), gap_vs_age=cor(e,age[i]))
 }
 tab <- function(p){
   m <- sapply(K, function(k) met(p, d$fold==k))
-  sprintf("MAE %.3f ± %.3f  CS5 %.1f ± %.1f%%  r %.3f ± %.3f  rs %.3f ± %.3f  gap~age r %+.3f",
+  sprintf("MAE %.3f +/- %.3f  CS5 %.1f +/- %.1f%%  r %.3f +/- %.3f  rs %.3f +/- %.3f  gap~age r %+.3f",
           m[1,] |> mean(), sd(m[1,]), mean(m[2,]), sd(m[2,]), mean(m[3,]), sd(m[3,]), mean(m[4,]), sd(m[4,]), mean(m[5,]))
 }
 for(nm in names(cfg)) cat(sprintf("  %-36s %s\n", nm, tab(cfg[[nm]])))
@@ -82,7 +76,7 @@ run <- function(fm_add, lab, dat=d){
   m1 <- coxph(as.formula(paste("Surv(t,e)~gap+",fm_add)), s); m0 <- coxph(as.formula(paste("Surv(t,e)~",fm_add)), s)
   m2 <- coxph(as.formula(paste("Surv(t,e)~gap_sd+",fm_add)), s)
   c1 <- summary(m1)$conf.int["gap",]; c2 <- summary(m2)$conf.int["gap_sd",]
-  cat(sprintf("  %-52s n=%4d  HR per year %.3f (%.3f-%.3f)  HR per SD %.3f (%.3f-%.3f)  P=%.1e  ΔC %+.4f\n", lab, nrow(s),
+  cat(sprintf("  %-52s n=%4d  HR per year %.3f (%.3f-%.3f)  HR per SD %.3f (%.3f-%.3f)  P=%.1e  dC %+.4f\n", lab, nrow(s),
               c1[1],c1[3],c1[4], c2[1],c2[3],c2[4], summary(m1)$coef["gap",5], concordance(m1)$concordance-concordance(m0)$concordance))
   invisible(m1)
 }

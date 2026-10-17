@@ -1,11 +1,3 @@
-"""Train the YOLO11s knee detector (two classes: participant's right and left knee).
-
-Labels come from heuristic bootstrapping (23 of 24 checked boxes correct), not manual annotation. Films with a high
-suspicion score (weak joint-space dip, or left-right joint-row difference > 250) are excluded before training.
-
-Horizontal flipping is disabled (fliplr=0): the two knees are mirror images, so flipping would make the classes
-indistinguishable.
-"""
 import os, csv, random, shutil, sys
 SRC = "/home/data/knee_yolo"
 DS  = "/home/data/knee_yolo/ds"

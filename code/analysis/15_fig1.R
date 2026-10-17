@@ -1,8 +1,3 @@
-# Figure 1: study workflow (A), cross-fitting and age distribution (B), age prediction performance (C), all-cause mortality (D),
-#   joint stratification with Phenotypic Age acceleration (E), phenome-wide scan (F).
-# Input: results/analysis/* (survey-weighted mortality results in weighted/, from 06_weighted.R and 07_weighted_boot.R),
-#   results/predictions/cv_<backbone>_oof.csv, code/analysis/phewas_labels.R, example knee ROIs
-# Output: results/figures/Figure1/Figure1.{png,pdf,tiff} (183 x 166.5 mm) and panel PDFs in panels/
 suppressPackageStartupMessages({library(grid); library(ggplot2); library(survival); library(ggrepel)})
 source("code/analysis/phewas_labels.R")
 out <- "results/figures/Figure1"; dir.create(out, recursive = TRUE, showWarnings = FALSE)
@@ -19,7 +14,7 @@ PR <- sapply(names(MODS)[-1], function(a) { x <- read.csv(sprintf("results/predi
   x$pred_age[match(d$SEQN, x$SEQN)] })
 PR <- cbind(ensemble = d$pred_raw, PR); stopifnot(!anyNA(PR))
 CS5 <- sapply(split(seq_len(nrow(d)), d$fold), function(i) 100 * mean(abs(PR[i, "ensemble"] - d$age[i]) <= 5))
-stopifnot(round(mean(CS5), 1) == 64.5, round(sd(CS5), 1) == 1.7)  # CS (α = 5 y) 64.5 ± 1.7
+stopifnot(round(mean(CS5), 1) == 64.5, round(sd(CS5), 1) == 1.7)  # CS (alpha = 5 y) 64.5 +/- 1.7
 # primary analyses are survey-weighted
 M1 <- read.csv("results/analysis/weighted/model1_full_cohort.csv"); M1 <- M1[M1$outcome == "allcause", ]
 PW <- read.csv("results/analysis/phewas/phewas_results.csv"); PW <- PW[PW$set == "main" & !is.na(PW$p), ]
@@ -121,7 +116,7 @@ p_age <- ggplot(AG) + geom_rect(aes(xmin = 0, xmax = Freq, ymin = lo + .12, ymax
   scale_y_reverse(breaks = seq(60, 90, 10), labels = c(60, 70, 80, "90+"), limits = c(95, 60), expand = c(0, 0)) +  # panel spans 60-95
   # y-axis title on two lines
   labs(x = "Number of participants", y = "Chronological age\n(years)") + th + theme(axis.title.y = element_text(lineheight = .95))
-# C top: scatter + fitted line; r and MAE are means ± SD over the five held-out folds
+# C top: scatter + fitted line; r and MAE are means +/- SD over the five held-out folds
 fit <- coef(lm(pred_raw ~ age, d))
 SHOW_IDENTITY <- FALSE  # TRUE adds the identity line
 p_sc <- ggplot(d, aes(age, pred_raw)) + geom_point(size = .18, alpha = .16, colour = C$blue, shape = 16) +
@@ -139,7 +134,7 @@ p_sc <- ggplot(d, aes(age, pred_raw)) + geom_point(size = .18, alpha = .16, colo
   coord_cartesian(xlim = c(59.5, 90.5), ylim = c(48, 96), expand = FALSE) +
   labs(x = "Chronological age (years)", y = "Predicted knee age\n(years)") + th + theme(axis.title.y = element_text(lineheight = .95))
 # C bottom: cumulative score CS(x), the percentage with absolute error <= x years (pooled out-of-fold predictions);
-#   the ensemble CS5 (fold mean ± SD) is marked at x = 5
+#   the ensemble CS5 (fold mean +/- SD) is marked at x = 5
 XS <- seq(0, 16, .1)
 CSD <- do.call(rbind, lapply(names(MODS), function(m) { e <- abs(PR[, m] - d$age)
   data.frame(model = MODS[[m]], x = XS, cs = 100 * sapply(XS, function(x) mean(e <= x))) }))
@@ -188,7 +183,7 @@ p_km <- ggplot(STD, aes(time, allcause, colour = q)) + geom_step(linewidth = .45
 c3 <- read.csv("results/analysis/weighted/figure3_cells.csv"); c3 <- c3[c3$outcome == "allcause", ]
 JC1 <- data.frame(panel = "main", y = c3$y, x = c3$x, hr = c3$hr, ref = c3$y == "Q1" & c3$x == "Q1", n = c3$n)
 QL4 <- paste0("Q", 1:4); JC1$x <- factor(JC1$x, QL4); JC1$y <- factor(JC1$y, QL4); JC1$dark <- abs(log(JC1$hr)) > 0.8
-stopifnot(f2(JC1$hr[JC1$x == "Q4" & JC1$y == "Q4"]) == "3.93", JC1$ref[JC1$x == "Q1" & JC1$y == "Q1"])  # reference cell Q1×Q1
+stopifnot(f2(JC1$hr[JC1$x == "Q4" & JC1$y == "Q4"]) == "3.93", JC1$ref[JC1$x == "Q1" & JC1$y == "Q1"])  # reference cell Q1xQ1
 p_joint <- ggplot(JC1, aes(x, y, fill = log(hr))) + geom_tile(colour = "white", linewidth = .6) +
   geom_text(aes(label = ifelse(ref, "Ref", f2(hr)), colour = dark), size = 5.2 / .pt, family = "Arial", fontface = "bold") +
   scale_fill_gradient2(low = "#2a78d6", mid = "white", high = "#eb6834", midpoint = 0, limits = c(-log(5), log(5))) +
@@ -369,5 +364,5 @@ for (nm in names(PANELS)) cat(sprintf("  panels/%s.pdf: %s\n", nm,
     write_pdf(file.path(out, "panels", paste0(nm, ".pdf")), PANELS[[nm]][[2]], PANELS[[nm]][[3]],
     function() { o <- PANELS[[nm]][[1]]
   if (is.function(o)) o() else print(o) })))
-cat(sprintf("Figure 1 -> %s; MAE %.2f ± %.2f, r %.3f ± %.3f, CS5 %.1f ± %.1f; HR/SD %.2f; PheWAS %d phenotypes, %d at FDR<5%%\n",
+cat(sprintf("Figure 1 -> %s; MAE %.2f +/- %.2f, r %.3f +/- %.3f, CS5 %.1f +/- %.1f; HR/SD %.2f; PheWAS %d phenotypes, %d at FDR<5%%\n",
             out, mean(PF$MAE), sd(PF$MAE), mean(PF$r), sd(PF$r), mean(CS5), sd(CS5), M1$hr_sd, nrow(PW), sum(PW$fdr < 0.05)))

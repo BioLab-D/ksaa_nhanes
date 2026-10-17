@@ -1,7 +1,4 @@
 #!/bin/bash
-# Five-fold cross-fitting of the knee age model (4 transformer blocks, 448-px ROIs): per-fold internal-validation MAE and
-# out-of-fold predictions. Knee recipe: knee augmentation, per-image P0.5-P99.5 normalization, AdamW with cosine decay.
-# Section 1 = the five backbones in the manuscript; sections 2 and 3 = ablations not reported. Usage: bash train_5fold.sh
 export TORCH_HOME=/home/data/torch PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True N_VIEWS=2 DROP=0 NO_ALBUMENTATIONS_UPDATE=1
 PY=${PY:-python}; cd /tmp/mammo_age_official; D=${D:-/home/data/knee_yolo/v2}; mkdir -p $D
 F='grep --line-buffered -vE check_version|fetch_version|validated_self|UserWarning|data.=.fetch'
@@ -17,7 +14,7 @@ run(){ t=$1; shift; L=$D/$t.log
   echo "=== end $(date '+%F %T') ===" >> $L
   if [ -s $D/${t}_folds.csv ]; then
     v=$(tail -n +2 $D/${t}_folds.csv | cut -d, -f2)
-    ms=$(echo "$v" | awk '{s+=$1;q+=$1*$1;n++}END{printf "%.4f ± %.4f", s/n, sqrt((q-s*s/n)/(n-1))}')
+    ms=$(echo "$v" | awk '{s+=$1;q+=$1*$1;n++}END{printf "%.4f +/- %.4f", s/n, sqrt((q-s*s/n)/(n-1))}')
     echo "$(date '+%F %T')  $t  $(echo $v | tr '\n' ' ') | mean $ms" >> $Q
   else echo "$(date '+%F %T')  $t no output (see $t.log)" >> $Q; fi
 }

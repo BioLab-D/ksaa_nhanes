@@ -1,4 +1,3 @@
-# Shared figure code: paths, colors, theme, number formatting, saving
 suppressMessages({library(ggplot2); library(patchwork); library(survival)})
 RES <- here::here("results"); ANA <- file.path(RES, "analysis"); FIGD <- here::here("results", "figures")
 INK <- "#0b0b0b"; INK2 <- "#52514e"; MUTED <- "#898781"; GRID <- "#e1e0d9"; AXIS <- "#c3c2b7"

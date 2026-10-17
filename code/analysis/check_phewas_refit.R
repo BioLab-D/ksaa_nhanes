@@ -1,5 +1,3 @@
-# Refit selected PheWAS phenotypes using only the CSV files in data/derived/ and compare with the shipped phewas_results.csv.
-# Needs R with survey and MASS, not run_all.sh. Run from the repository root: Rscript code/analysis/check_phewas_refit.R
 suppressMessages({ library(survey); library(MASS) }); options(survey.lonely.psu = "adjust")
 d <- read.csv(here::here("data", "derived", "analysis_dataset.csv"), na.strings = "")
 Y <- read.csv(here::here("data", "derived", "phewas", "phenotype_values.csv"), check.names = FALSE, na.strings = "")

@@ -1,9 +1,3 @@
-# Handling plan for categorical variables with > 2 levels; 10_phewas.R uses the class column.
-#   ORD: ordinal scale; LAT: none/right/left/both -> either side vs none; YNA: yes/no/not applicable -> yes vs no;
-#   NOM: nominal (10_phewas.R gives a joint test only). drop_levels lists levels set to missing first.
-# Input: results of the preliminary unweighted scan (preliminary_scan_results.csv; that scan is not part of this repository).
-#   The plan was drawn up when the scan was to be run in CLARITE, hence the CLARITE wording; the plan used is in data/phewas/.
-# Output: results/analysis/phewas/phewas_multilevel_plan.csv
 F <- read.csv(here::here("results", "analysis", "phewas", "preliminary_scan_results.csv"))
 M <- F[F$type == "categorical" & F$levels > 2, c("variable", "label", "levels", "domain", "group")]
 LAT <- c("HAG23", "PEP10B1", "PEP10B2", "PEP10B3", "PEP10B4", "PEP10C1", "PEP10C2", "PEP4A1", "PEP4A3", "PEP4CMCJ", "PEP4CMCP", "PEP4CMCT",

@@ -1,7 +1,3 @@
-# Characteristics by KSAA quartile for Table S3 (the overall column is cross-checked against Table 1): unweighted means and
-# percentages, design-based P values (Rao-Scott F for categorical, Kruskal-Wallis for continuous; cohort as a domain, phase 2
-# design for the K-L reading).
-# Input: results/analysis/analysis_data.rds, fxf_vars.csv. Output: results/analysis/quartile_characteristics.csv
 res <- here::here("results"); out <- file.path(res, "analysis")
 d <- readRDS(file.path(out, "analysis_data.rds"))
 qc <- quantile(d$gap, 0:4 / 4)
@@ -14,13 +10,13 @@ fp <- function(p) ifelse(is.na(p), "", ifelse(p < 0.001, "&lt;0.001", formatC(p,
 WP <- local({   # design-based P values by variable; participants missing the variable are left out of the domain
   source(here::here("code", "analysis", "weighted_common.R"), local = TRUE)
   D6 <- update(D6, q = factor(q, QL), sexf = factor(HSSEX), racef = factor(DMARETHN)); D2 <- update(D2, q = factor(q, QL))
-  stopifnot(all(F$HSSEX[F$inc] == F$sex[F$inc]), all(F$DMARETHN[F$inc] == F$race[F$inc]))
-  kw <- function(v) svyranktest(as.formula(paste(v, "~ q")), dom6(F$inc & !is.na(F[[v]])), test = "KruskalWallis")$p.value[[1]]
-  rs <- function(v, ok = F[[v]], des = dom6)
-    svychisq(as.formula(paste("~", v, "+ q")), des(F$inc & !is.na(ok)), statistic = "F")$p.value[[1]]
+  stopifnot(all(adult$HSSEX[adult$inc] == adult$sex[adult$inc]), all(adult$DMARETHN[adult$inc] == adult$race[adult$inc]))
+  kw <- function(v) svyranktest(as.formula(paste(v, "~ q")), dom6(adult$inc & !is.na(adult[[v]])), test = "KruskalWallis")$p.value[[1]]
+  rs <- function(v, ok = adult[[v]], des = dom6)
+    svychisq(as.formula(paste("~", v, "+ q")), des(adult$inc & !is.na(ok)), statistic = "F")$p.value[[1]]
   c(sapply(c(age = "age", bmi = "bmi", tc = "tc", hdl = "hdl", egfr = "egfr", pa_accel = "pa_accel", fn_bmd = "fn_bmd",
              tot_bmd = "tot_bmd", gait = "gait"), kw),
-    sex = rs("sexf", F$sex), race = rs("racef", F$race),
+    sex = rs("sexf", adult$sex), race = rs("racef", adult$race),
     sapply(c(edu3 = "edu3", poor = "poor", smk3 = "smk3", alc3 = "alc3", pa3 = "pa3", htn = "htn", dm = "dm", cvd_hist = "cvd_hist",
              cancer_hist = "cancer_hist", pain = "pain", anylimit = "anylimit", fx_hip = "fx_hip", fx_any = "fx_any", fall = "fall"), rs),
     oa = rs("oa", des = dom2))
