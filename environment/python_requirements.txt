@@ -1,6 +1,6 @@
-# Figure 4 (code/analysis/fig4_phewas_clarite.py; run under CLARITE_PY by run_all.sh)
+# Figure 4 (code/analysis/19_fig4_phewas_clarite.py; run under CLARITE_PY by run_all.sh)
 clarite==2.3.6          # its own environment was used: Python 3.9, matplotlib 3.9.4
-PyMuPDF                 # PDF rendering in fig4_phewas_clarite.py
+PyMuPDF                 # PDF rendering in 19_fig4_phewas_clarite.py
 Pillow
 
 # Knee age model training (code/model; GPU server, CUDA 12.1)

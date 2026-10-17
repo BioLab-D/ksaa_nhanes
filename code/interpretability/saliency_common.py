@@ -4,7 +4,7 @@ from PIL import Image
 KB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 ROI = os.environ.get("KNEE_ROI", os.path.join(KB, "data", "knee_roi"))                   # ROI images (output of the code/images pipeline)
 OUT = os.path.join(KB, "results", "analysis", "saliency")
-MODELS = os.environ.get("KSAA_MODELS", os.path.join(KB, "models"))    # final full-data models m5_full_<backbone>_full.pt
+MODELS = os.environ.get("KSAA_MODELS", os.path.join(KB, "models"))    # final full-data models full_<backbone>.pt
 SNAP = os.path.join(KB, "code", "model")        # Mammo-AGE model code
 S, R = 448, 112                                                     # model input size; grid size for saved maps and figures
 REG = ["Femur, lateral", "Femur, medial", "Joint band, lateral", "Joint band, medial", "Tibia, lateral", "Tibia, medial"]
@@ -30,16 +30,21 @@ def pool(t):                                                         # [S,S] -> 
 def joint_line(u):
     """Joint line of a [R,R] image: the row (36-76) whose mean intensity over columns 28-83 is furthest below the mean of the
     rows 6 above and 6 below. After mirroring, lateral (fibular side) is on the left and medial on the right."""
-    p = np.convolve(np.asarray(u, np.float32)[:, 28:84].mean(1), np.ones(3) / 3, "same"); r = np.arange(36, 77)
+    p = np.convolve(np.asarray(u, np.float32)[:, 28:84].mean(1), np.ones(3) / 3, "same")
+    r = np.arange(36, 77)
     return int(r[((p[r - 6] + p[r + 6]) / 2 - p[r]).argmax()])
 
 def regions(u):
     """6 non-overlapping regions covering the image (femur / joint band / tibia x lateral / medial), [6,R,R] boolean."""
-    j = joint_line(u); rows = np.arange(R)[:, None]; med = np.arange(R)[None, :] >= R // 2
+    j = joint_line(u)
+    rows = np.arange(R)[:, None]
+    med = np.arange(R)[None, :] >= R // 2
     band = np.where(rows < j - HALF, 0, np.where(rows <= j + HALF, 1, 2))
     return np.stack([(band == b) & (med == bool(s)) for b in range(3) for s in range(2)]), j
 
 def otsu(u, bins=64):                                               # bone / soft-tissue threshold (unit gray)
-    h, e = np.histogram(np.asarray(u, np.float32), bins=bins, range=(0, 1)); p = h / h.sum(); w = np.cumsum(p)
+    h, e = np.histogram(np.asarray(u, np.float32), bins=bins, range=(0, 1))
+    p = h / h.sum()
+    w = np.cumsum(p)
     mu = np.cumsum(p * (e[:-1] + e[1:]) / 2); s = (mu[-1] * w - mu) ** 2 / (w * (1 - w) + 1e-12)
     return float(e[np.argmax(s) + 1])

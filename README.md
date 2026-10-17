@@ -32,7 +32,7 @@ This repository contains the code and public-use derived data needed to reproduc
 
 ```
 run_all.sh             reproduces every table, figure and in-text number from data/ (about 15 min)
-code/analysis/         KSAA construction and all statistical analyses (R; Figure 4A in Python)
+code/analysis/         KSAA construction and all statistical analyses, numbered 01-20 in run order (R; Figure 4A in Python)
 code/images/           radiograph download, YOLO11 knee detection, ROI cropping (GPU)
 code/model/            knee age model (adapted Mammo-AGE), five-fold cross-fitting, full-data training (GPU)
 code/interpretability/ occlusion sensitivity maps (Fig. S2) and related checks (GPU)
@@ -87,14 +87,14 @@ Rscript code/analysis/check_phewas_refit.R
 ### 4.1 Run the Pipeline
 
 ```bash
-bash run_all.sh                                             # all steps; outputs go to results/
+bash run_all.sh                                             # all scripts in code/analysis, in numbered order; outputs go to results/
 CLARITE_PY=~/miniconda3/envs/clarite/bin/python bash run_all.sh   # CLARITE in a separate environment (Figure 4)
-bash run_all.sh manuscript_tables                           # re-run one step (earlier steps must have run)
+bash run_all.sh 13 14                                       # re-run scripts 13 and 14 (earlier ones must have run)
 ```
 
-The pipeline starts from the NHANES III files in `data/nhanes3/` and the out-of-fold predictions in `data/predictions/`. Its last step, `verify_derived`, compares the regenerated results with `data/derived/` and stops with an error if any value differs. Tables are written to `results/analysis/tables/` (HTML) and `results/analysis/weighted/` (CSV), figures to `results/figures/`, and console logs to `results/logs/`.
+The pipeline starts from the NHANES III files in `data/nhanes3/` and the out-of-fold predictions in `data/predictions/`. The scripts in `code/analysis/` are numbered in the order they run. The last step, `verify_derived.R`, compares the regenerated results with `data/derived/` and stops with an error if any value differs. Tables are written to `results/analysis/tables/` (HTML) and `results/analysis/weighted/` (CSV), figures to `results/figures/`, and console logs to `results/logs/`.
 
-Primary analyses are survey-weighted: `weighted_common.R` builds the design on all 17,705 adult examinees (NHANES III examination weights, strata and primary sampling units; phase 2 weights for analyses of the K–L reading) and analyzes the cohort as a domain. Bootstrap CIs use Rao–Wu rescaling bootstrap replicate weights (`weighted_boot.R`; 500 replicates for standardized risks, 200 for discrimination). Follow-up runs from the examination (`PERMTH_EXM`) to death or 31 December 2019; Phenotypic Age acceleration is winsorized at the 1st and 99th percentiles.
+Primary analyses are survey-weighted: `weighted_common.R` builds the design on all 17,705 adult examinees (NHANES III examination weights, strata and primary sampling units; phase 2 weights for analyses of the K–L reading) and analyzes the cohort as a domain. Bootstrap CIs use Rao–Wu rescaling bootstrap replicate weights (`07_weighted_boot.R`; 500 replicates for standardized risks, 200 for discrimination). Follow-up runs from the examination (`PERMTH_EXM`) to death or 31 December 2019; Phenotypic Age acceleration is winsorized at the 1st and 99th percentiles.
 
 ### 4.2 Where Each Result Comes From
 
@@ -102,24 +102,24 @@ Outputs used in the manuscript are named after the manuscript item; scripts are 
 
 | Manuscript item | Output (under `results/`) | Script |
 |---|---|---|
-| KSAA | `ksaa_oof.csv` | `ksaa_ensemble.R` |
-| Table 1 | `analysis/tables/table1.html` | `manuscript_tables.R` |
-| Table 2 | `analysis/weighted/table2.csv` | `weighted.R` |
-| Figure 1 | `figures/Figure1/Figure1.{pdf,png}` | `weighted.R`, `weighted_boot.R`, `phewas.R` → `fig1.R` |
-| Figure 2 | `figures/Figure2.{pdf,png}` | `weighted_boot.R` → `fig2_mortality.R` |
-| Figure 3 | `figures/Figure3.{pdf,png}` | `weighted.R`, `weighted_boot.R` → `fig3_incremental.R` |
-| Figure 4 | `figures/Figure4.{pdf,png}` | `phewas.R` → `fig4_phewas.R`, `fig4_phewas_clarite.py` |
-| Table S1 | `analysis/tables/tableS1.html` | `tableS1_performance.R`, `manuscript_tables.R` |
-| Table S2 | covariate definitions (text) | `build_analysis_data.R` |
-| Table S3 | `analysis/tables/tableS3.html` | `quartile_characteristics.R` → `manuscript_tables.R` |
-| Tables S4, S5, S7, S10 | `analysis/weighted/tableS{4,5,7,10}.csv` | `weighted.R` |
-| Table S6 | `analysis/weighted/tableS6.csv` | `weighted_boot.R` |
-| Tables S8, S9 | `analysis/tables/tableS{8,9}.html`; all results in `analysis/phewas/phewas_results.csv` | `phewas_clean.R`, `phewas_audit.R`, `phewas.R` → `phewas_table.R` |
-| Fig. S1 | `figures/FigureS1.{pdf,png}` | `figS1_biascorr.R` |
+| KSAA | `ksaa_oof.csv` | `02_ksaa_ensemble.R` |
+| Table 1 | `analysis/tables/table1.html` | `13_manuscript_tables.R` |
+| Table 2 | `analysis/weighted/table2.csv` | `06_weighted.R` |
+| Figure 1 | `figures/Figure1/Figure1.{pdf,png}` | `06_weighted.R`, `07_weighted_boot.R`, `10_phewas.R` → `15_fig1.R` |
+| Figure 2 | `figures/Figure2.{pdf,png}` | `07_weighted_boot.R` → `16_fig2_mortality.R` |
+| Figure 3 | `figures/Figure3.{pdf,png}` | `06_weighted.R`, `07_weighted_boot.R` → `17_fig3_incremental.R` |
+| Figure 4 | `figures/Figure4.{pdf,png}` | `10_phewas.R` → `18_fig4_phewas.R`, `19_fig4_phewas_clarite.py` |
+| Table S1 | `analysis/tables/tableS1.html` | `13_manuscript_tables.R` |
+| Table S2 | covariate definitions (text) | `03_build_analysis_data.R` |
+| Table S3 | `analysis/tables/tableS3.html` | `05_quartile_characteristics.R` → `13_manuscript_tables.R` |
+| Tables S4, S5, S7, S10 | `analysis/weighted/tableS{4,5,7,10}.csv` | `06_weighted.R` |
+| Table S6 | `analysis/weighted/tableS6.csv` | `07_weighted_boot.R` |
+| Tables S8, S9 | `analysis/tables/tableS{8,9}.html`; all results in `analysis/phewas/phewas_results.csv` | `08_phewas_clean.R`, `09_phewas_audit.R`, `10_phewas.R` → `11_phewas_tables.R` |
+| Fig. S1 | `figures/FigureS1.{pdf,png}` | `20_figS1_biascorr.R` |
 | Fig. S2 | `figures/FigureS2.{pdf,png}` (run separately, section 6) | `code/interpretability/` |
-| Fig. S3 | `figures/FigureS3.{pdf,png}` | `weighted.R` → `fig2_mortality.R` |
-| Partial correlations with K–L grade and BMD | `analysis/kl_dxa_partial_cor.csv` | `kl_bmd_partial_cor.R` |
-| Other in-text numbers | `logs/manuscript_numbers.txt` and the CSV files above | `manuscript_numbers.R` |
+| Fig. S3 | `figures/FigureS3.{pdf,png}` | `06_weighted.R` → `16_fig2_mortality.R` |
+| Partial correlations with K–L grade and BMD | `analysis/kl_dxa_partial_cor.csv` | `12_kl_bmd_partial_cor.R` |
+| Other in-text numbers | `logs/14_manuscript_numbers.txt` and the CSV files above | `14_manuscript_numbers.R` |
 
 The Figure 2 P values for trend use all 4,875 participants (age and sex adjusted); the Table 2 P values use the 4,347 participants with complete Model 3 covariates.
 
@@ -149,7 +149,7 @@ Later sections of `train_5fold.sh` are ablations not reported in the manuscript 
 
 ### 5.3 Applying the Models to New Radiographs
 
-The five full-data checkpoints (`m5_full_<backbone>_full.pt`, 559 MB in total) are distributed separately; place them in `models/`. Combine them with the ensemble weights and bias correction in `data/derived/new_data_calibration.csv`:
+The five full-data checkpoints (`full_<backbone>.pt`, 559 MB in total) are distributed separately; place them in `models/`. Combine them with the ensemble weights and bias correction in `data/derived/new_data_calibration.csv`:
 
 ```
 pred_raw = Σ ensemble_weight × predicted age of each checkpoint

@@ -16,7 +16,7 @@ for i, r in enumerate(rows):
 np.save(os.path.join(OUT, "img_all.npy"), IMG)
 V = {}
 for k in ["resnet18", "resnet50", "efficientnetb0", "convnexttiny", "densenet121"]:
-    ck = torch.load(os.path.join(MODELS, f"m5_full_{k}_full.pt"), map_location="cpu", weights_only=False)
+    ck = torch.load(os.path.join(MODELS, f"full_{k}.pt"), map_location="cpu", weights_only=False)
     V[k] = set(map(str, ck["val_seqn"]))
 assert all(v == V["resnet18"] for v in V.values())                  # the 5 models share the same internal validation set
 HO = sorted((r["SEQN"] for r in rows if r["SEQN"] in V["resnet18"]), key=int)

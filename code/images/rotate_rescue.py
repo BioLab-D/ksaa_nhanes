@@ -19,11 +19,15 @@ def try_one(img):
     rr = m.predict(img, imgsz=1024, conf=0.25, device=0, verbose=False)[0]
     b = rr.boxes
     if b is None or len(b) == 0: return None
-    cls = b.cls.cpu().numpy().astype(int); xywh = b.xywh.cpu().numpy(); cf = b.conf.cpu().numpy()
+    cls = b.cls.cpu().numpy().astype(int)
+    xywh = b.xywh.cpu().numpy()
+    cf = b.conf.cpu().numpy()
     if (cls==0).sum() != 1 or (cls==1).sum() != 1: return None
     pR, pL = xywh[cls==0][0], xywh[cls==1][0]
     if abs(pR[0]-pL[0]) < abs(pR[1]-pL[1]): return None      # still stacked vertically
-    if pR[0] > pL[0]: return None                            # the participant's right knee is on the image left
+    # the participant's right knee is on the image left
+    if pR[0] > pL[0]:
+        return None
     return float(cf.mean()), cls, xywh, rr.orig_shape
 
 out = []

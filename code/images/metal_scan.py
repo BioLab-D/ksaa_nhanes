@@ -23,7 +23,9 @@ if __name__ == "__main__":
     fs = sorted(glob.glob(f"{ROI}/*.png"))
     with Pool(12) as p: res = [r for r in p.map(one, fs, chunksize=40) if r]
     with open(f"{SRC}/metal_scan.csv","w",newline="") as fh:
-        w = csv.writer(fh); w.writerow(["roi","frac_top","p999_ratio"]); w.writerows(res)
+        w = csv.writer(fh)
+        w.writerow(["roi","frac_top","p999_ratio"])
+        w.writerows(res)
     grp = {"lowconf":[], "rot":[], "main":[]}
     for name, ft, _ in res:
         stem = name.rsplit("_",1)[0]
