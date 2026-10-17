@@ -4,8 +4,6 @@ Code and derived data for:
 
 > Sheng C, Zhang Y, Li X, Chen K. Deep learning–estimated skeletal age acceleration from knee radiographs and long-term mortality in older US adults: a cohort study. *Manuscript under review.*
 
-We trained a deep learning model to estimate age from the bilateral knee radiographs of 4,875 NHANES III participants aged 60 years or older, and studied how knee skeletal age acceleration (KSAA), the part of predicted knee age not explained by chronological age, relates to mortality through 2019 and to 482 phenotypes.
-
 ![Study overview](docs/overview.png)
 
 ## Data
@@ -16,16 +14,7 @@ All inputs are public-use files from the National Center for Health Statistics:
 - NHANES III knee radiographs (4,908 films, about 171 GB) and the phase 2 radiograph reading file: <https://ftp.cdc.gov/pub/NHANES/XRays/Nhanes3/>
 - Public-use Linked Mortality File, follow-up through 31 December 2019: <https://www.cdc.gov/nchs/data-linkage/mortality-public.htm>
 
-The radiographs are not included here. Everything else needed for the statistical analyses is in `data/`:
-
-| Folder | Content |
-|---|---|
-| `data/nhanes3/` | NHANES III files for the 4,908 participants with knee radiographs (DuckDB) |
-| `data/predictions/` | Out-of-fold age predictions of the five backbones |
-| `data/prepared/`, `data/images/`, `data/phewas/` | Variable extracts, image-processing logs and the PheWAS candidate pool |
-| `data/derived/` | Analysis dataset, per-participant KSAA and PheWAS results, exactly as used in the manuscript |
-
-See [`data/README.md`](data/README.md) and [`data/derived/README.md`](data/derived/README.md) for column definitions.
+The radiographs are not included here; everything else needed for the statistical analyses is in `data/` (see [`data/README.md`](data/README.md)).
 
 ## Requirements
 
@@ -72,22 +61,8 @@ To re-run selected scripts after a full run, give their numbers, e.g. `bash run_
 
 ## Knee age model
 
-The model adapts [Mammo-AGE](https://doi.org/10.1038/s41467-025-65923-5) to read both knees together. The steps below produced the files in `data/predictions/` and are not needed to reproduce the analyses.
-
-1. `code/images/`: download the radiographs, detect both knees with YOLO11 and crop regions of interest ([README](code/images/README.md)).
-2. `code/model/train_5fold.sh`: train the five backbones with participant-level five-fold cross-fitting, about 100 GPU-hours ([README](code/model/README.md)).
-3. `code/analysis/02_ksaa_ensemble.R`: combine the backbones and correct for age bias to obtain KSAA.
-
-Models trained on the full cohort (`full_<backbone>.pt`, 559 MB) will be deposited on Zenodo (DOI to be added); [`models/README.md`](models/README.md) describes how to apply them to new radiographs. Performance on weight-bearing or digital radiographs and in adults younger than 60 years has not been evaluated.
-
-## Citation
-
-If you use this code or data, please cite the article above (citation will be updated on publication).
+Image processing and model training, which produced `data/predictions/`, are in [`code/images/`](code/images/README.md) and [`code/model/`](code/model/README.md); they are not needed to reproduce the analyses.
 
 ## License
 
 The code is released under the [MIT License](LICENSE). Files in `code/model/` adapted from Mammo-AGE remain under the Apache License 2.0 ([`LICENSE_Mammo-AGE`](code/model/LICENSE_Mammo-AGE)). NHANES data are public-use data from NCHS and are subject to the NCHS data use restrictions.
-
-## Contact
-
-Xiangchun Li (lixiangchun@tmu.edu.cn) or Kexin Chen (chenkexin@tmu.edu.cn), Tianjin Medical University Cancer Institute and Hospital. Questions about the code can also be posted as GitHub issues.
