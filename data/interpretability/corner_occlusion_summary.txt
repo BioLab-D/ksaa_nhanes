@@ -1,8 +1,0 @@
-None                             MAE 4.36  dMAE +0.000 (+0.000 to +0.000)  shift +0.000 (+0.000 to +0.000)  mean |shift| 0.000  r 0.743
-Top-left corner                  MAE 4.39  dMAE +0.028 (-0.009 to +0.065)  shift -0.058 (-0.099 to -0.018)  mean |shift| 0.340  r 0.736
-Top-right corner                 MAE 4.42  dMAE +0.058 (+0.006 to +0.113)  shift +0.088 (+0.034 to +0.144)  mean |shift| 0.480  r 0.734
-Bottom-left corner               MAE 4.37  dMAE +0.006 (-0.031 to +0.042)  shift +0.179 (+0.146 to +0.212)  mean |shift| 0.302  r 0.741
-Bottom-right corner              MAE 4.38  dMAE +0.018 (+0.002 to +0.036)  shift -0.029 (-0.047 to -0.011)  mean |shift| 0.124  r 0.741
-Both top corners                 MAE 4.45  dMAE +0.092 (+0.026 to +0.158)  shift +0.029 (-0.042 to +0.099)  mean |shift| 0.618  r 0.726
-All four corners                 MAE 4.50  dMAE +0.143 (+0.059 to +0.227)  shift +0.181 (+0.093 to +0.271)  mean |shift| 0.763  r 0.720
-Control: mid-edge left + right   MAE 4.46  dMAE +0.097 (+0.023 to +0.174)  shift +0.258 (+0.181 to +0.338)  mean |shift| 0.678  r 0.731

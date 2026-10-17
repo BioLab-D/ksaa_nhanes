@@ -14,7 +14,7 @@ All inputs are public-use files from the National Center for Health Statistics:
 - NHANES III knee radiographs (4,908 films, about 171 GB) and the phase 2 radiograph reading file: <https://ftp.cdc.gov/pub/NHANES/XRays/Nhanes3/>
 - Public-use Linked Mortality File, follow-up through 31 December 2019: <https://www.cdc.gov/nchs/data-linkage/mortality-public.htm>
 
-The radiographs are not included here; everything else needed for the statistical analyses is in `data/` (see [`data/README.md`](data/README.md)).
+The data and the analysis files derived from them (`data/`) are not included in this repository.
 
 ## Requirements
 
@@ -34,7 +34,7 @@ Exact versions are listed in [`environment/`](environment/). The analyses were r
 
 ## Reproducing the results
 
-From the repository root:
+With the input files in `data/`, run from the repository root:
 
 ```bash
 CLARITE_PY=$(conda run -n clarite which python) bash run_all.sh
@@ -61,7 +61,7 @@ To re-run selected scripts after a full run, give their numbers, e.g. `bash run_
 
 ## Knee age model
 
-Image processing and model training, which produced `data/predictions/`, are in [`code/images/`](code/images/README.md) and [`code/model/`](code/model/README.md); they are not needed to reproduce the analyses.
+Image processing and model training, which produced the age predictions, are in [`code/images/`](code/images/README.md) and [`code/model/`](code/model/README.md); they are not needed to reproduce the analyses.
 
 ## License
 

@@ -15,7 +15,7 @@ python knee_v2.py --tag cv_<backbone> --arch <resnet18|resnet50|efficientnet_b0|
 - Knee-specific recipe: AdamW with cosine decay (learning rate 1 × 10⁻⁴, weight decay 1 × 10⁻⁴, five-epoch warm-up), up to 80 epochs, and early stopping on internal-validation MAE (patience 15, not before epoch 60). Augmentations and normalisation are set by the `--aug knee` and `--norm pct` options of `knee_v2.py` (section 1 of `train_5fold.sh`).
 - Paths are those of the training server: the shell scripts run `knee_v2.py` from `/tmp/mammo_age_official` (a copy of this directory) and write to `/home/data/knee_yolo/v2`; edit them for your system.
 - Inputs: the ROI directory (`--roi_dir`, default `/home/data/knee_roi`) and a label file `/tmp/surv_labels.csv` with columns `SEQN` and `age` (produced by `code/analysis/01_survival_labels.R`).
-- Outputs: `{tag}_oof.csv` (out-of-fold predictions) and `{tag}_folds.csv` (per-fold internal-validation MAE), as shipped in `data/predictions/`. Held-out predictions were written to a separate directory and were not examined until all backbones had been trained on all folds.
+- Outputs: `{tag}_oof.csv` (out-of-fold predictions) and `{tag}_folds.csv` (per-fold internal-validation MAE), read by the analysis from `data/predictions/`. Held-out predictions were written to a separate directory and were not examined until all backbones had been trained on all folds.
 - `train_full.sh`: `--full --save_dir <dir>` trains each backbone once on all participants and saves the checkpoint (see `models/README.md`).
 - Hardware: one NVIDIA RTX 3090 (24 GB). Mean training time per outer fold ranged from 111 min (ResNet-18) to 424 min (ConvNeXt-Tiny), about 100 GPU-hours for the five backbones × five folds.
 
