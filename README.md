@@ -18,7 +18,7 @@ The data and the analysis files derived from them (`data/`) are not included in 
 
 ## Requirements
 
-- R 4.5.2 (any R ≥ 4.3 should work) with:
+- R 4.5.2 with:
   
   ```r
   install.packages(c("DBI", "duckdb", "ggplot2", "ggrepel", "here", "MASS", "mice", "mitools",
