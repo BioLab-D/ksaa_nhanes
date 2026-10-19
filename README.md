@@ -19,11 +19,13 @@ The data and the analysis files derived from them (`data/`) are not included in 
 ## Requirements
 
 - R 4.5.2 (any R ≥ 4.3 should work) with:
+  
   ```r
   install.packages(c("DBI", "duckdb", "ggplot2", "ggrepel", "here", "MASS", "mice", "mitools",
                      "patchwork", "png", "ragg", "survey", "survival"))
   ```
 - Figure 4A only: Python ≤ 3.10 with CLARITE 2.3.6, PyMuPDF and Pillow:
+  
   ```bash
   conda create -n clarite python=3.9 -y
   conda run -n clarite pip install clarite==2.3.6 PyMuPDF Pillow
@@ -44,25 +46,23 @@ This runs the scripts in `code/analysis/` in numbered order (01–20) and takes 
 
 To re-run selected scripts after a full run, give their numbers, e.g. `bash run_all.sh 13 14`.
 
-| Manuscript item | Output (in `results/`) | Script |
-|---|---|---|
-| Table 1, Tables S1 and S3 | `analysis/tables/table1.html`, `tableS1.html`, `tableS3.html` | `13_manuscript_tables.R` |
-| Table 2 | `analysis/weighted/table2.csv` | `06_weighted.R` |
-| Tables S4, S5, S7, S10 | `analysis/weighted/tableS*.csv` | `06_weighted.R` |
-| Table S6 | `analysis/weighted/tableS6.csv` | `07_weighted_boot.R` |
-| Tables S8 and S9 | `analysis/tables/tableS8.html`, `tableS9.html` | `08`–`11_phewas*.R` |
-| Figure 1 | `figures/Figure1/Figure1.pdf` | `15_fig1.R` |
-| Figure 2, Fig. S3 | `figures/Figure2.pdf`, `FigureS3.pdf` | `16_fig2_mortality.R` |
-| Figure 3 | `figures/Figure3.pdf` | `17_fig3_incremental.R` |
-| Figure 4 | `figures/Figure4.pdf` | `18_fig4_phewas.R`, `19_fig4_phewas_clarite.py` |
-| Fig. S1 | `figures/FigureS1.pdf` | `20_figS1_biascorr.R` |
-| Fig. S2 | `figures/FigureS2.pdf` (needs the radiographs and a GPU) | `code/interpretability/` |
-| Other numbers in the text | `logs/*.txt` | `02`, `12`, `14` |
+| Manuscript item           | Output (in `results/`)                                        | Script                                          |
+| ------------------------- | ------------------------------------------------------------- | ----------------------------------------------- |
+| Table 1, Tables S1 and S3 | `analysis/tables/table1.html`, `tableS1.html`, `tableS3.html` | `13_manuscript_tables.R`                        |
+| Table 2                   | `analysis/weighted/table2.csv`                                | `06_weighted.R`                                 |
+| Tables S4, S5, S7, S10    | `analysis/weighted/tableS*.csv`                               | `06_weighted.R`                                 |
+| Table S6                  | `analysis/weighted/tableS6.csv`                               | `07_weighted_boot.R`                            |
+| Tables S8 and S9          | `analysis/tables/tableS8.html`, `tableS9.html`                | `08`–`11_phewas*.R`                             |
+| Figure 1                  | `figures/Figure1/Figure1.pdf`                                 | `15_fig1.R`                                     |
+| Figure 2, Fig. S3         | `figures/Figure2.pdf`, `FigureS3.pdf`                         | `16_fig2_mortality.R`                           |
+| Figure 3                  | `figures/Figure3.pdf`                                         | `17_fig3_incremental.R`                         |
+| Figure 4                  | `figures/Figure4.pdf`                                         | `18_fig4_phewas.R`, `19_fig4_phewas_clarite.py` |
+| Fig. S1                   | `figures/FigureS1.pdf`                                        | `20_figS1_biascorr.R`                           |
+| Fig. S2                   | `figures/FigureS2.pdf` (needs the radiographs and a GPU)      | `code/interpretability/`                        |
+| Other numbers in the text | `logs/*.txt`                                                  | `02`, `12`, `14`                                |
 
 ## Knee age model
 
 Image processing and model training, which produced the age predictions, are in [`code/images/`](code/images/README.md) and [`code/model/`](code/model/README.md); they are not needed to reproduce the analyses.
 
-## License
-
-The code is released under the [MIT License](LICENSE). Files in `code/model/` adapted from Mammo-AGE remain under the Apache License 2.0 ([`LICENSE_Mammo-AGE`](code/model/LICENSE_Mammo-AGE)). NHANES data are public-use data from NCHS and are subject to the NCHS data use restrictions.
+# 
