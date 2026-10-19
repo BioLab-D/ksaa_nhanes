@@ -159,19 +159,25 @@ for (o in names(OUT)) stopifnot(all.equal(unlist(AB[AB$outcome == o, paste0("Q",
 OUTB <- c(allcause = "D", cvd = "E", cancer = "F")
 YMAXB <- c(allcause = 60, cvd = 30, cancer = 15); YSTEP <- c(allcause = 20, cvd = 10, cancer = 5)
 YTB <- c(allcause = "10-year all-cause mortality (%)", cvd = "10-year cardiovascular death (%)", cancer = "10-year cancer death (%)")
+YMINB <- c(allcause = 20, cvd = 10, cancer = 5)  # truncated y axis (bars start here); break mark drawn on the y axis
 bar_plot <- function(o, lab = NULL, xtitle = TRUE, rdlab = TRUE) {
-  a <- AB[AB$outcome == o, ]; ym <- YMAXB[[o]]
-  B <- data.frame(q = factor(QL, QL), y = 100 * unlist(a[, paste0("Q", 1:4)], use.names = FALSE))
+  a <- AB[AB$outcome == o, ]; ym <- YMAXB[[o]]; y0 <- YMINB[[o]]
+  B <- data.frame(q = factor(QL, QL), x = 1:4, y = 100 * unlist(a[, paste0("Q", 1:4)], use.names = FALSE))
   rd <- sprintf("Q4 \u2212 Q1  %s pp (%s to %s)", f2(100 * a$rd, 1), f2(100 * a$rd_lo, 1), f2(100 * a$rd_hi, 1))
-  p0 <- ggplot(B, aes(q, y, fill = q)) + geom_col(width = .58) +
-    geom_text(aes(label = sprintf("%.1f", y)), vjust = -.45, size = (FS - .5) / .pt, family = "Arial", colour = INK) +
+  # y-axis break: gap in the axis line just above y0, with two short slanted ticks
+  g0 <- y0 + .03 * (ym - y0); g1 <- y0 + .06 * (ym - y0); dx <- .05; dy <- .012 * (ym - y0)
+  p0 <- ggplot(B) + geom_rect(aes(xmin = x - .29, xmax = x + .29, ymin = y0, ymax = y, fill = q)) +
+    geom_text(aes(x, y, label = sprintf("%.1f", y)), vjust = -.45, size = (FS - .5) / .pt, family = "Arial", colour = INK) +
     scale_fill_manual(values = QPAL, guide = "none") +
-    scale_y_continuous(breaks = seq(0, ym, by = YSTEP[[o]]), expand = c(0, 0)) +
-    coord_cartesian(xlim = c(.4, 4.6), ylim = c(0, ym), expand = FALSE, clip = "off") +  # about half a bar width of space at each end
+    scale_x_continuous(breaks = 1:4, labels = QL) +
+    scale_y_continuous(breaks = seq(y0, ym, by = YSTEP[[o]]), expand = c(0, 0)) +
+    coord_cartesian(xlim = c(.4, 4.6), ylim = c(y0, ym), expand = FALSE, clip = "off") +  # about half a bar width of space at each end
     labs(title = if (is.null(lab)) OUTB[[o]] else lab, x = if (xtitle) "KSAA quartile" else NULL, y = YTB[[o]]) + thk +
-    guides(x = guide_axis(cap = "both"), y = guide_axis(cap = "both")) + theme(plot.margin = margin(6, 6, 2, 2)) +
-    # guide_axis(cap) does not work on a discrete axis: draw the x-axis line as a segment at y = 0 instead
-    theme(axis.line.x = element_blank()) + annotate("segment", x = .4, xend = 4.6, y = 0, yend = 0, colour = INK, linewidth = .35, lineend = "square")
+    theme(plot.margin = margin(6, 6, 2, 2), axis.line = element_blank()) +
+    # both axis lines drawn as segments so the y axis can be broken
+    annotate("segment", x = .4, xend = 4.6, y = y0, yend = y0, colour = INK, linewidth = .35, lineend = "square") +
+    annotate("segment", x = .4, xend = .4, y = c(y0, g1), yend = c(g0, ym), colour = INK, linewidth = .35, lineend = "square") +
+    annotate("segment", x = .4 - dx, xend = .4 + dx, y = c(g0, g1) - dy, yend = c(g0, g1) + dy, colour = INK, linewidth = .35)
   if (rdlab) p0 <- p0 + annotate("text", x = 4.5, y = ym * .99, hjust = 1, vjust = 1, label = rd,
       size = (FS - .5) / .pt, family = "Arial", colour = INK)
   p0
